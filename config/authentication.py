@@ -10,6 +10,7 @@ class CookieJWTAuthentication(JWTAuthentication):
     Custom JWT Authentication that reads the access token from cookies instead of headers
     """
     def authenticate(self, request):
+        print("---------------------------",request.COOKIES)
         token = request.COOKIES.get("access")
         if not token:
             return None  # ✅ No token → anonymous user

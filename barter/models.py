@@ -3,13 +3,28 @@ from products.models import Product,Category
 from django.contrib.auth.models import User
 
 class ReplaceOption(models.Model):
+    REPLACE_TYPE_CHOICES = (
+        ("product", "Product"),
+        ("point", "Point"),
+    )
+
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="replace_options")
-    title = models.CharField(max_length=255)
+    replace_type = models.CharField(max_length=10, choices=REPLACE_TYPE_CHOICES, default="product")
+
+    # Only for product type
+    title = models.CharField(max_length=255, blank=True)
     description = models.TextField(blank=True)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
+
+    # Only for point type
+    point_value = models.PositiveIntegerField(null=True, blank=True)
+    meta = models.JSONField(blank=True, null=True)  # Store MRP, usage, condition, purchase_year
 
     def __str__(self):
-        return f"{self.product.title} → {self.title}"
+        if self.replace_type == "product":
+            return f"{self.product.title} → {self.title}"
+        return f"{self.product.title} → {self.point_value} pts"
+
 
 
 class BarterRequest(models.Model):

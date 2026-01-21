@@ -8,9 +8,10 @@ from .views import (
     product_list_paginated,
     product_list_by_category,
     product_list_by_user,
-    add_replace_options,
     upload_product_images,
-    products_grouped_by_category
+    products_grouped_by_category,
+    delete_product,
+    add_replace_options_bulk
 )
 
 urlpatterns = [
@@ -21,8 +22,10 @@ urlpatterns = [
     # Products
     path('', product_list_create, name='product-list-create'),
     path('<int:pk>/', product_detail, name='product-detail'),
-    path('<int:product_id>/replace-options/', add_replace_options, name='replace-options'),
+    path('<int:product_id>/replace-options/bulk/', add_replace_options_bulk, name='replace-options'),
     path('grouped/', products_grouped_by_category, name='replace-options'),
+    path('delete/<int:pk>/', delete_product, name='delete-product'),
+
 
     # Optional: individual image delete
     path('images_delete/<int:pk>/', product_image_delete, name='product-image-delete'),

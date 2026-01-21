@@ -8,7 +8,10 @@ from .serializers import ProductSerializer, CategorySerializer,ProductImageSeria
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Prefetch
-
+from django.shortcuts import get_object_or_404
+from google.cloud import storage
+from django.conf import settings
+from barter.models import ReplaceOption
 # --------------------
 # CATEGORY CRUD
 # --------------------
@@ -76,28 +79,48 @@ def product_list_create(request):
 # --------------------
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
-def add_replace_options(request, product_id):
+def add_replace_options_bulk(request, product_id):
     try:
         product = Product.objects.get(id=product_id, owner=request.user)
     except Product.DoesNotExist:
-        return Response({"error": "Product not found or not yours"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {"error": "Product not found or not yours"},
+            status=status.HTTP_404_NOT_FOUND
+        )
 
     data = request.data
     if not isinstance(data, list):
-        return Response({"error": "Expected a list of replace options"}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"error": "Expected a list of replace options"},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
-    created_options = []
+    objects_to_create = []
+
     for item in data:
         serializer = ReplaceOptionSerializer(data=item)
-        if serializer.is_valid():
-            serializer.save(product=product)
-            created_options.append(serializer.data)
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.is_valid(raise_exception=True)
+        v = serializer.validated_data
 
-    return Response(created_options, status=status.HTTP_201_CREATED)
+        objects_to_create.append(
+            ReplaceOption(
+                product=product,
+                replace_type=v.get("replace_type"),
+                title=v.get("title", ""),
+                description=v.get("description", ""),
+                category=v.get("category"),
+                point_value=v.get("point_value"),
+                meta=v.get("meta", {})
+            )
+        )
 
+    # 🔥 KEY LINE: reset replace options
+    product.replace_options.all().delete()
 
+    # 🔥 single DB hit
+    ReplaceOption.objects.bulk_create(objects_to_create)
+
+    return Response({"success": True}, status=status.HTTP_200_OK)
 
 # --------------------
 # PRODUCT IMAGES
@@ -260,3 +283,66 @@ def products_grouped_by_category(request):
         })
 
     return Response(data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_product(request, pk):
+    """
+    Delete a product, its images, thumbnail, and replace options from DB and GCS
+    """
+    product = get_object_or_404(Product, pk=pk)
+
+    try:
+        # ---------------- Delete replace options ----------------
+        product.replace_options.all().delete()
+
+        # ---------------- Setup GCS client ----------------
+        if not settings.GS_CREDENTIALS:
+            return Response(
+                {"detail": "GCS credentials not configured."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        client = storage.Client(
+            credentials=settings.GS_CREDENTIALS,
+            project=settings.GS_PROJECT_ID
+        )
+        bucket = client.bucket(settings.GS_BUCKET_NAME)
+        location = "uploads"  # matches your settings.STORAGES default location
+
+        # ---------------- Delete product images ----------------
+        for img in product.images.all():
+            if img.image:
+                blob_name = f"{location}/{img.image.name}"  # e.g. uploads/products/image.jpg
+                try:
+                    blob = bucket.blob(blob_name)
+                    blob.delete()
+                    print(f"Deleted image from GCS: {blob_name}")
+                except Exception as e:
+                    print(f"Failed to delete image {blob_name}: {e}")
+            img.delete()  # delete from DB
+
+        # ---------------- Delete thumbnail ----------------
+        if product.thumbnail:
+            blob_name = f"{location}/{product.thumbnail.name}"  # e.g. uploads/thumbnails/image.jpg
+            try:
+                blob = bucket.blob(blob_name)
+                blob.delete()
+                print(f"Deleted thumbnail from GCS: {blob_name}")
+            except Exception as e:
+                print(f"Failed to delete thumbnail {blob_name}: {e}")
+
+        # ---------------- Delete the product ----------------
+        product.delete()
+
+        return Response(
+            {"detail": "Product and related data deleted successfully."},
+            status=200
+        )
+
+    except Exception as e:
+        return Response(
+            {"detail": f"Failed to delete product: {str(e)}"},
+            status=status.HTTP_400_BAD_REQUEST
+        )

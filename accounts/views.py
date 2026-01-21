@@ -53,8 +53,9 @@ def google_login(request):
 
         # Generate JWT tokens
         tokens = get_tokens_for_user(user)
-
-        return Response({
+        print("-----------------------------",tokens)
+        
+        res = Response({
             "user": {
                 "id": user.id,
                 "username": user.username,
@@ -65,5 +66,8 @@ def google_login(request):
             "tokens": tokens
         })
 
+        return res
     except ValueError as e:
         return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
+
+

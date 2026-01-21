@@ -24,7 +24,7 @@ class Product(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    thumbnail = models.ImageField(upload_to="products/thumbnail")
+    thumbnail = models.ImageField(upload_to="thumbnails")
 
     def __str__(self):
         return self.title

@@ -55,17 +55,51 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-
     "rest_framework",
     "corsheaders",
     "storages",
-
     "accounts",
     "products",
     "barter",
     "chat",
     "core",
+    "rest_framework_simplejwt.token_blacklist"
 ]
+
+
+# ---------------JWT Config---------------
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+
+
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https:\/\/solid-space-winner-.*\.app\.github\.dev$",
+]
+
+CORS_ALLOW_HEADERS = [
+    "authorization",
+    "content-type",
+    "Access-Control-Allow-Origin",
+]
+
+REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS':'drf_spectacular.openapi.AutoSchema','DEFAULT_AUTHENTICATION_CLASSES': (
+        'config.authentication.CookieJWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+    'rest_framework.permissions.IsAuthenticated',
+),
+
+    }
+
+CORS_ALLOW_CREDENTIALS = True
+
+
+
 
 # --------------------
 # MIDDLEWARE
@@ -81,6 +115,15 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://solid-space-winner-5rqgwq4qxq7c449p-5173.app.github.dev",
+]
+
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True
 
 # --------------------
 # URLS / TEMPLATES
@@ -127,26 +170,7 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # --------------------
 # CORS
 # --------------------
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 
-# --------------------
-# JWT
-# --------------------
-REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS':'drf_spectacular.openapi.AutoSchema','DEFAULT_AUTHENTICATION_CLASSES': (
-        'config.authentication.CookieJWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-    'rest_framework.permissions.IsAuthenticated',
-),
 
-    }
 
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),   # 1 day
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # Optional, 7 days
-    'ROTATE_REFRESH_TOKENS': False,
-    'BLACKLIST_AFTER_ROTATION': True,
-    'ALGORITHM': 'HS256',
-    'SIGNING_KEY': SECRET_KEY,
-    'AUTH_HEADER_TYPES': ('Bearer',),
-}
