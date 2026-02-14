@@ -3,3 +3,4 @@ venv/
 __pycache__/
 db.sqlite3
 staticfiles/
+tripplanner-478917-ac2d06427594.json
