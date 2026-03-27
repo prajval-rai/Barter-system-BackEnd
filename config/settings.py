@@ -13,7 +13,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY
 # --------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-key")
-DEBUG = os.getenv("DEBUG", "False") == "False"
+DEBUG = os.getenv("DEBUG", "False") == "True"
 ALLOWED_HOSTS = ["*"]
 
 # --------------------
@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
+    "channels",
+    "daphne",
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
@@ -63,9 +65,27 @@ INSTALLED_APPS = [
     "barter",
     "chat",
     "core",
+    "scan_product",
     "rest_framework_simplejwt.token_blacklist"
 ]
 
+
+ASGI_APPLICATION = 'config.asgi.application'
+
+
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    "redis://default:haTX44BXWkgdc7zhwG5tUdaN4l7CXjoa@redis-10563.crce292.ap-south-1-2.ec2.cloud.redislabs.com:10563"
+)
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [REDIS_URL],
+        },
+    },
+}
 
 # ---------------JWT Config---------------
 SIMPLE_JWT = {
@@ -118,7 +138,14 @@ MIDDLEWARE = [
 
 CSRF_TRUSTED_ORIGINS = [
     "https://solid-space-winner-5rqgwq4qxq7c449p-5173.app.github.dev",
+    "http://localhost:3000"
 ]
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 
 CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
@@ -152,14 +179,21 @@ WSGI_APPLICATION = "config.wsgi.application"
 # --------------------
 # DATABASE
 # --------------------
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL"),
-        conn_max_age=600,
-        ssl_require=True
-    )
-}
-
+if DEBUG:  # Local development
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
+else:  # Production
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.getenv("DATABASE_URL"),
+            conn_max_age=600,
+            ssl_require=True
+        )
+    }
 # --------------------
 # STATIC FILES
 # --------------------

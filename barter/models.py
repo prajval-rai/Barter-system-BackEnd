@@ -3,13 +3,10 @@ from products.models import Product,Category
 from django.contrib.auth.models import User
 
 class ReplaceOption(models.Model):
-    REPLACE_TYPE_CHOICES = (
-        ("product", "Product"),
-        ("point", "Point"),
-    )
+    
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="replace_options")
-    replace_type = models.CharField(max_length=10, choices=REPLACE_TYPE_CHOICES, default="product")
+    replace_type = models.CharField(max_length=10, default="product",null=True,blank=True)
 
     # Only for product type
     title = models.CharField(max_length=255, blank=True)
@@ -19,6 +16,9 @@ class ReplaceOption(models.Model):
     # Only for point type
     point_value = models.PositiveIntegerField(null=True, blank=True)
     meta = models.JSONField(blank=True, null=True)  # Store MRP, usage, condition, purchase_year
+
+    icon = models.CharField(max_length=100, default="noto:package")
+
 
     def __str__(self):
         if self.replace_type == "product":
@@ -35,16 +35,31 @@ class BarterRequest(models.Model):
         ("completed", "Completed"),
     )
 
-    from_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_requests")
-    to_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_requests")
+    from_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="sent_requests"
+    )
 
-    requested_product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="offers_received")
+    to_user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="received_requests"
+    )
 
-    extra_offer = models.TextField(blank=True)  # cash / service / add-on
+    request_product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="products_offered"
+    )
+
+    request_for_product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name="products_requested"
+    )
+
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pending")
+    msg = models.TextField()
 
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.from_user} → {self.to_user}"
+        return f"{self.from_user} offering {self.request_product} for {self.request_for_product}"
 
