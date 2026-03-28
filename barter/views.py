@@ -79,7 +79,7 @@ def get_accepted_request(request):
     requests = BarterRequest.objects.filter(
         # ✅ Either side of the trade, as long as it's accepted
         Q(from_user=request.user) | Q(to_user=request.user),
-        status="accepted",
+        Q(status="accepted") | Q(status="completed"),
     ).select_related(
         "request_product",
         "request_for_product",
@@ -143,3 +143,71 @@ def update_barter_status(request, request_id):
     serializer = BarterRequestSerializer(barter_request)
 
     return Response(serializer.data)
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def saved_products(request):
+    data = SaveProducts.objects.filter(user=request.user)
+    serializer = SaveProductsSerializer(data, many=True)
+    return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def save_product(request):
+    serializer = SaveProductsSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(user=request.user)
+        return Response(serializer.data, status=201)
+    return Response(serializer.errors, status=400)
+
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_saved_product(request, pk):
+    try:
+        obj = SaveProducts.objects.get(pk=pk, user=request.user)
+    except SaveProducts.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    obj.delete()
+    return Response({"message": "Removed"}, status=204)
+
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def toggle_save_product(request):
+    product_id = request.data.get('product')
+
+    obj, created = SaveProducts.objects.get_or_create(
+        user=request.user,
+        product_id=product_id
+    )
+
+    if not created:
+        obj.delete()
+        return Response({"message": "Product unsaved"})
+
+    return Response({"message": "Product saved"})
+
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def is_saved(request):
+    product_id = request.query_params.get('product')
+
+    exists = SaveProducts.objects.filter(
+        user=request.user,
+        product_id=product_id
+    ).exists()
+
+    return Response({"is_saved": exists})

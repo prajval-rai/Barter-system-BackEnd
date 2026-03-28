@@ -8,8 +8,8 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from helper_function.config import Config
 from django.utils import timezone
-from .models import UserProfile
-from .serializer import ProfileSerializer
+from .models import UserProfile,UserNotification
+from .serializer import ProfileSerializer,UserNotificationSerializer
 
 
 GOOGLE_CLIENT_ID = Config.google_key
@@ -211,3 +211,72 @@ def update_profile(request):
             {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
+    
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def notifications(request):
+    if request.method == 'GET':
+        data = UserNotification.objects.filter(user=request.user).order_by('-id')
+        serializer = UserNotificationSerializer(data, many=True)
+        return Response(serializer.data)
+
+    if request.method == 'POST':
+        serializer = UserNotificationSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+    
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def notification_detail(request, pk):
+    try:
+        obj = UserNotification.objects.get(pk=pk, user=request.user)
+    except UserNotification.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    if request.method == 'GET':
+        return Response(UserNotificationSerializer(obj).data)
+
+    elif request.method in ['PUT', 'PATCH']:
+        serializer = UserNotificationSerializer(obj, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    elif request.method == 'DELETE':
+        obj.delete()
+        return Response({"message": "Deleted"}, status=204)
+    
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def mark_notification_read(request, pk):
+    try:
+        obj = UserNotification.objects.get(pk=pk, user=request.user)
+    except UserNotification.DoesNotExist:
+        return Response({"error": "Not found"}, status=404)
+
+    obj.staus = True
+    obj.save()
+    return Response({"message": "Marked as read"})
+
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def mark_all_read(request):
+    UserNotification.objects.filter(user=request.user, staus=False).update(staus=True)
+    return Response({"message": "All notifications marked as read"})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def unread_count(request):
+    count = UserNotification.objects.filter(user=request.user, staus=False).count()
+    return Response({"unread_count": count})

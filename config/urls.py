@@ -25,4 +25,5 @@ urlpatterns = [
     path("products/",include("products.urls")),
     path("scan/",include("scan_product.urls")),
     path("barter/",include("barter.urls")),
+    path("chat/",include("chat.urls"))
 ]

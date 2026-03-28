@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import BarterRequest
+from .models import BarterRequest,SaveProducts
 from products.models import Product
 
 class BarterRequestCreateSerializer(serializers.ModelSerializer):
@@ -50,3 +50,10 @@ class BarterRequestSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         ]
+
+
+class SaveProductsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SaveProducts
+        fields = '__all__'
+        read_only_fields = ['user', 'created_at']
