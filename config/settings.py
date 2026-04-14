@@ -108,8 +108,12 @@ SIMPLE_JWT = {
 }
 
 
-CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https:\/\/solid-space-winner-.*\.app\.github\.dev$",
+CORS_ALLOWED_ORIGINS = [
+    os.getenv("CORS_ALLOWED_ORIGINS"),
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    os.getenv("CSRF_TRUSTED_ORIGINS"),
 ]
 
 CORS_ALLOW_HEADERS = [
@@ -147,15 +151,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://solid-space-winner-5rqgwq4qxq7c449p-5173.app.github.dev",
-    "http://localhost:3000"
-]
-
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
 
 
 CSRF_COOKIE_SAMESITE = "None"
