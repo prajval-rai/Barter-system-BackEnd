@@ -108,6 +108,7 @@ def google_login(request):
             secure=True,  # change to True in production
             samesite="None",
             domain="localhost"
+            max_age=86400,
         )
 
         phone = profile.contact_number
@@ -122,7 +123,9 @@ def google_login(request):
             httponly=True,
             secure=True,  # change to True in production
             samesite="None",
-            domain="localhost"
+            domain="localhost",
+            max_age=604800,
+
         )
 
         return response
