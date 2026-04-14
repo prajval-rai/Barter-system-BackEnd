@@ -107,7 +107,6 @@ def google_login(request):
             httponly=True,
             secure=True,  # change to True in production
             samesite="None",
-            domain="localhost"
             max_age=86400,
         )
 
@@ -123,7 +122,6 @@ def google_login(request):
             httponly=True,
             secure=True,  # change to True in production
             samesite="None",
-            domain="localhost",
             max_age=604800,
 
         )
