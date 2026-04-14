@@ -105,8 +105,8 @@ def google_login(request):
             key="access",
             value=tokens["access"],
             httponly=True,
-            secure=False,  # change to True in production
-            samesite="Lax",
+            secure=True,  # change to True in production
+            samesite="None",
             domain="localhost"
         )
 
@@ -120,8 +120,8 @@ def google_login(request):
             key="refresh",
             value=tokens["refresh"],
             httponly=True,
-            secure=False,  # change to True in production
-            samesite="Lax",
+            secure=True,  # change to True in production
+            samesite="None",
             domain="localhost"
         )
 
