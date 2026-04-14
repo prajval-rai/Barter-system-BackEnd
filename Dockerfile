@@ -16,5 +16,6 @@ RUN pip install -r requirements.txt
 
 COPY . .
 
-# ✅ Use daphne since you have Django Channels
-CMD ["sh", "-c", "python manage.py migrate && python manage.py collectstatic --noinput && daphne -b 0.0.0.0 -p $PORT config.asgi:application"]
+RUN python manage.py collectstatic --noinput
+
+CMD ["sh", "-c", "python manage.py migrate && daphne -b 0.0.0.0 -p $PORT config.asgi:application"]
