@@ -10,6 +10,7 @@ from helper_function.config import Config
 from django.utils import timezone
 from .models import UserProfile,UserNotification
 from .serializer import ProfileSerializer,UserNotificationSerializer
+from utils.twilio_service import send_whatsapp_message
 
 
 GOOGLE_CLIENT_ID = Config.google_key
@@ -108,6 +109,12 @@ def google_login(request):
             samesite="Lax",
             domain="localhost"
         )
+
+        phone = profile.contact_number
+        first_name = user.first_name
+
+
+        send_whatsapp_message(phone,f"Wellcome {first_name}")
 
         response.set_cookie(
             key="refresh",

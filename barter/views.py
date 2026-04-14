@@ -6,7 +6,10 @@ from rest_framework.response import Response
 from rest_framework import status
 from .models import Product, BarterRequest
 from .serializers import *
-from django.db.models import Q
+from django.db.models import Q,Subquery, OuterRef, IntegerField,Count
+from django.db.models.functions import Coalesce
+from utils.twilio_service import send_whatsapp_message
+from chat.models import ChatMessage
 
 
 @api_view(["POST"])
@@ -42,6 +45,32 @@ def create_barter_request(request):
             request_for_product=request_for_product
         )
 
+        receiver_phone = to_user.userprofile.contact_number
+        if receiver_phone:
+            receiver_phone = f"+91{receiver_phone}"
+            receiver_msg = (
+                f"🔔 *New Barter Request Received!*\n\n"
+                f"Hey *{to_user.username}* 👋\n\n"
+                f"Someone is interested in bartering with you!\n\n"
+                f"━━━━━━━━━━━━━━━━\n"
+                f"👤 *Request From:* {request.user.username}\n"
+                f"📦 *They're Offering:* {request_product.title}\n"
+                f"🎯 *They Want:* {request_for_product.title}\n"
+                f"━━━━━━━━━━━━━━━━\n\n"
+                f"⚡ *Action Required!*\n"
+                f"  • Open the app to review the offer\n"
+                f"  • Accept if you're interested in the trade\n"
+                f"  • Decline if it's not a good fit for you\n\n"
+                f"⏰ *Don't keep them waiting —* "
+                f"respond to the request at your earliest!\n\n"
+                f"🤝 Happy Trading!\n\n"
+                f"_– BarterApp Team_ 🛍️"
+            )
+            try:
+                send_whatsapp_message(receiver_phone, receiver_msg)
+            except Exception as e:
+                print("WhatsApp Error (receiver):", str(e))
+
         return Response(
             {"message": "Barter request sent", "id": barter_request.id},
             status=201
@@ -71,23 +100,54 @@ def get_barter_requests(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def get_accepted_request(request):
-    """
-    ✅ FIX: Both the requester (from_user) AND the acceptor (to_user)
-    should see the chat. The original code only returned chats where
-    the current user was to_user, so the sender never saw their chat.
-    """
+    user = request.user
+
+    # Subquery: unread count for this user in each chat
+    unread_subquery = ChatMessage.objects.filter(
+        barter_request_id=OuterRef('pk'),
+        seen=False,
+    ).exclude(
+        sender=user
+    ).values('barter_request_id').annotate(
+        c=Count('id')
+    ).values('c')
+
+    # Subquery: last message text
+    last_msg_subquery = ChatMessage.objects.filter(
+        barter_request_id=OuterRef('pk')
+    ).order_by('-created_at').values('text')[:1]
+
+    # Subquery: last message timestamp
+    last_time_subquery = ChatMessage.objects.filter(
+        barter_request_id=OuterRef('pk')
+    ).order_by('-created_at').values('created_at')[:1]
+
+    # Subquery: last message sender email
+    last_sender_subquery = ChatMessage.objects.filter(
+        barter_request_id=OuterRef('pk')
+    ).order_by('-created_at').values('sender__email')[:1]
+
     requests = BarterRequest.objects.filter(
-        # ✅ Either side of the trade, as long as it's accepted
-        Q(from_user=request.user) | Q(to_user=request.user),
+        Q(from_user=user) | Q(to_user=user),
         Q(status="accepted") | Q(status="completed"),
     ).select_related(
         "request_product",
         "request_for_product",
         "from_user",
         "to_user",
-    ).order_by("-created_at")
- 
-    serializer = BarterRequestSerializer(requests, many=True, context={"request": request})
+    ).annotate(
+        unread_count=Coalesce(
+            Subquery(unread_subquery, output_field=IntegerField()),
+            0
+        ),
+        last_message=Subquery(last_msg_subquery),
+        last_message_time=Subquery(last_time_subquery),
+        last_message_sender=Subquery(last_sender_subquery),
+    ).order_by('-created_at')
+
+    serializer = BarterRequestSerializer(
+        requests, many=True, context={"request": request}
+    )
     return Response(serializer.data)
 
 

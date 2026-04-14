@@ -17,6 +17,7 @@ import json
 from django.db.models import Q
 from accounts.models import UserProfile
 from barter.serializers import ProductBasicSerializer
+from utils.twilio_service import send_whatsapp_message
 # --------------------
 # CATEGORY CRUD
 # --------------------
@@ -134,6 +135,31 @@ def create_product(request):
         images = request.FILES.getlist('images')
         for f in images:
             ProductImage.objects.create(product=product, image=f)
+
+        phone = request.user.userprofile.contact_number
+        if phone:
+            phone = f"+91{phone}"  # important for Twilio
+
+            message = (
+    f"🎉 *Product Listed Successfully!*\n\n"
+    f"Hey *{request.user.username}* 👋\n\n"
+    f"Your product is now *live* and under review by our team.\n\n"
+    f"━━━━━━━━━━━━━━━━\n"
+    f"📦 *Product:* {product.title}\n"
+    f"📌 *Status:* Under Review 🔍\n"
+    f"━━━━━━━━━━━━━━━━\n\n"
+    f"⏳ *What happens next?*\n"
+    f"  • Our team will review your listing\n"
+    f"  • Once approved, it becomes visible to all users\n"
+    f"  • You'll get notified the moment someone matches your exchange!\n\n"
+    f"💡 *Pro Tip:* Make sure your product images are clear and "
+    f"your exchange options are accurate for faster approval.\n\n"
+    f"🤝 Happy Trading & Best of Luck!\n\n"
+    f"_– BarterApp Team_ 🛍️"
+)
+
+            send_whatsapp_message(phone, message)
+
 
         return Response(
             {
@@ -517,34 +543,133 @@ def admin_products_by_status(request):
 
 
 
+@permission_classes([IsAuthenticated])
 @api_view(["POST"])
 def change_product_status(request):
     try:
         status_value = request.GET.get('status')
         status_choice = ["submitted","approved","closed","rejected","banned"]
+
         if status_value not in status_choice:
-            return Response({"message":"Select Proper Status"},status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message":"Select Proper Status"}, status=status.HTTP_400_BAD_REQUEST)
+
         product_id = request.GET.get('product_id')
-        User_obj = UserProfile.objects.get(user=request.user.id)
-        if User_obj.role == "Admin":
+
+        user_profile = UserProfile.objects.get(user=request.user.id)
+
+        if user_profile.role == "Admin":
+
             product_obj = Product.objects.get(id=product_id)
             product_obj.status = status_value
             product_obj.save()
+
+            # -------------------------
+            # 🔔 WhatsApp Notification
+            # -------------------------
+            owner_profile = UserProfile.objects.get(user=product_obj.owner)
+
+            phone = owner_profile.contact_number
+
+            if phone:
+                phone = f"+91{phone}"
+
+                # Friendly message based on status
+                if status_value == "approved":
+                    msg = (
+                        f"✅ *Product Approved!*\n\n"
+                        f"Hey *{product_obj.owner.username}* 👋\n\n"
+                        f"🎉 Great news! Your product has been *approved* and is now *live* on the platform!\n\n"
+                        f"━━━━━━━━━━━━━━━━\n"
+                        f"📦 *Product:* {product_obj.title}\n"
+                        f"📌 *Status:* Approved ✅\n"
+                        f"━━━━━━━━━━━━━━━━\n\n"
+                        f"🤝 Other users can now discover and barter with your product.\n\n"
+                        f"💡 *Tip:* Keep your product details updated to attract more offers!\n\n"
+                        f"_– BarterApp Team_ 🛍️"
+                    )
+
+                elif status_value == "rejected":
+                    msg = (
+                        f"❌ *Product Rejected*\n\n"
+                        f"Hi *{product_obj.owner.username}* 👋\n\n"
+                        f"Unfortunately, your product has been *rejected* after review.\n\n"
+                        f"━━━━━━━━━━━━━━━━\n"
+                        f"📦 *Product:* {product_obj.title}\n"
+                        f"📌 *Status:* Rejected ❌\n"
+                        f"━━━━━━━━━━━━━━━━\n\n"
+                        f"🔍 *What to do next?*\n"
+                        f"  • Review your product title & description\n"
+                        f"  • Ensure images are clear & relevant\n"
+                        f"  • Re-submit after making improvements\n\n"
+                        f"📩 Need help? contact our support team.\n\n"
+                        f"_– BarterApp Team_ 🛍️"
+                    )
+
+                elif status_value == "closed":
+                    msg = (
+                        f"🔒 *Product Closed*\n\n"
+                        f"Hi *{product_obj.owner.username}* 👋\n\n"
+                        f"Your product has been *closed* and is no longer available for barter.\n\n"
+                        f"━━━━━━━━━━━━━━━━\n"
+                        f"📦 *Product:* {product_obj.title}\n"
+                        f"📌 *Status:* Closed 🔒\n"
+                        f"━━━━━━━━━━━━━━━━\n\n"
+                        f"📌 *Why might this happen?*\n"
+                        f"  • The barter was successfully completed\n"
+                        f"  • The listing was manually closed by admin\n\n"
+                        f"➕ Want to list something new? Head over to the app!\n\n"
+                        f"_– BarterApp Team_ 🛍️"
+                    )
+
+                elif status_value == "banned":
+                    msg = (
+                        f"🚫 *Product Banned*\n\n"
+                        f"Hi *{product_obj.owner.username}* 👋\n\n"
+                        f"Your product has been *banned* due to a policy violation.\n\n"
+                        f"━━━━━━━━━━━━━━━━\n"
+                        f"📦 *Product:* {product_obj.title}\n"
+                        f"📌 *Status:* Banned 🚫\n"
+                        f"━━━━━━━━━━━━━━━━\n\n"
+                        f"⚠️ *This may have happened because:*\n"
+                        f"  • The product violates our community guidelines\n"
+                        f"  • Inappropriate content was detected\n"
+                        f"  • Repeated policy breaches\n\n"
+                        f"📩 *Think this is a mistake?*\n"
+                        f"Contact our support team and we'll look into it.\n\n"
+                        f"_– BarterApp Team_ 🛍️"
+                    )
+
+                else:
+                    msg = (
+                        f"🔔 *Product Status Updated*\n\n"
+                        f"Hi *{product_obj.owner.username}* 👋\n\n"
+                        f"There's an update on one of your listed products.\n\n"
+                        f"━━━━━━━━━━━━━━━━\n"
+                        f"📦 *Product:* {product_obj.title}\n"
+                        f"📌 *New Status:* {status_value.capitalize()}\n"
+                        f"━━━━━━━━━━━━━━━━\n\n"
+                        f"Open the app for more details.\n\n"
+                        f"_– BarterApp Team_ 🛍️"
+                    )
+                try:
+                    send_whatsapp_message(phone, msg)
+                except Exception as e:
+                    print("WhatsApp Error:", str(e))
+
             return Response({
-                "message":"Status Changed"
+                "message": "Status Changed"
             })
 
-        
         else:
             return Response({
-                "message":"You are not allowed to change status!"
+                "message": "You are not allowed to change status!"
             })
+
     except Exception as e:
         return Response(
-            {"detail": f"Failed to delete product: {str(e)}"},
+            {"detail": f"Failed to update status: {str(e)}"},
             status=status.HTTP_400_BAD_REQUEST
         )
-
 
 
 # GET /products/marketplace/

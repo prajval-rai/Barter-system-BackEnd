@@ -24,6 +24,9 @@ class Config:
     # Google Login
     GOOGLE_CLIENT_ID = "your-google-client-id.apps.googleusercontent.com"
     GOOGLE_CLIENT_SECRET = "your-google-client-secret"
+    TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+    TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+    TWILIO_WHATSAPP_NUMBER = os.getenv("TWILIO_WHATSAPP_NUMBER")
 
     # JWT / Auth (optional)
     JWT_SECRET_KEY = "your-jwt-secret"

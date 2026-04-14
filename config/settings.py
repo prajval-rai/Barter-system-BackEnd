@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from google.oauth2 import service_account
 import dj_database_url
 from datetime import timedelta
+import json
+
 
 load_dotenv()
 
@@ -14,6 +16,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # --------------------
 SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-key")
 DEBUG = os.getenv("DEBUG", "False") == "True"
+CLOUD_FILE_NAME = os.getenv("CLOUD_FILE_NAME") 
+GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 ALLOWED_HOSTS = ["*"]
 
 # --------------------
@@ -25,10 +29,17 @@ GS_PROJECT_ID = os.getenv("project_id")
 CLOUD_FILE_NAME = os.getenv("cloud_file_name")
 GS_CREDENTIALS = None
 
-if CLOUD_FILE_NAME:
+if GOOGLE_SERVICE_ACCOUNT_JSON:
+    # Production (Railway) — load from env variable
+    GS_CREDENTIALS = service_account.Credentials.from_service_account_info(
+        json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
+    )
+elif CLOUD_FILE_NAME:
+    # Local development — load from file
     GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
         os.path.join(BASE_DIR, CLOUD_FILE_NAME)
     )
+
 
 STORAGES = {
     "default": {
