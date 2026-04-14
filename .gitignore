@@ -1,0 +1,79 @@
+# ─── Python ─────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.env/
+.venv/
+
+# Environment Variables (IMPORTANT)
+.env
+.env.*
+
+# Django / App specific
+db.sqlite3
+*.log
+local_settings.py
+media/
+
+# Static files (collected)
+staticfiles/
+
+# Secrets / Credentials
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.json
+
+# But allow specific safe JSON if needed
+# !example_config.json
+
+# Docker ────────────────────────────────────────────────
+docker-compose.override.yml
+*.pid
+
+# Ignore local Docker volumes
+data/
+postgres_data/
+redis_data/
+
+# Build / cache
+*.cache
+*.bak
+
+# IDE / Editor ─────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# Git ─────────────────────────────────────────────────
+.gitignore
+.gitkeep
+
+# Node (if using Next.js frontend)
+node_modules/
+.next/
+out/
+dist/
+
+# Coverage / Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+logs/
+*.log
+
+# Misc
+*.sqlite3
+*.db
