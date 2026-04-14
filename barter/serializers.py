@@ -33,14 +33,19 @@ class ProductBasicSerializer(serializers.ModelSerializer):
 
 class BarterRequestSerializer(serializers.ModelSerializer):
 
-    request_product = ProductBasicSerializer(read_only=True)
+    request_product     = ProductBasicSerializer(read_only=True)
     request_for_product = ProductBasicSerializer(read_only=True)
+    from_user = serializers.CharField(source="from_user.email", read_only=True)
+    to_user   = serializers.CharField(source="to_user.email",   read_only=True)
 
-    from_user = serializers.CharField(source="from_user.username", read_only=True)
-    to_user = serializers.CharField(source="to_user.username", read_only=True)
+    # ── New fields from annotations ───────────────────────────────────────────
+    unread_count         = serializers.IntegerField(read_only=True, default=0)
+    last_message         = serializers.CharField(read_only=True, default="", allow_null=True)
+    last_message_time    = serializers.DateTimeField(read_only=True, default=None, allow_null=True)
+    last_message_sender  = serializers.CharField(read_only=True, default="", allow_null=True)
 
     class Meta:
-        model = BarterRequest
+        model  = BarterRequest
         fields = [
             "id",
             "from_user",
@@ -49,7 +54,13 @@ class BarterRequestSerializer(serializers.ModelSerializer):
             "request_for_product",
             "status",
             "created_at",
+            # new
+            "unread_count",
+            "last_message",
+            "last_message_time",
+            "last_message_sender",
         ]
+
 
 
 class SaveProductsSerializer(serializers.ModelSerializer):
