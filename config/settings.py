@@ -30,12 +30,10 @@ CLOUD_FILE_NAME = os.getenv("cloud_file_name")
 GS_CREDENTIALS = None
 
 if GOOGLE_SERVICE_ACCOUNT_JSON:
-    # Production (Railway) — load from env variable
     GS_CREDENTIALS = service_account.Credentials.from_service_account_info(
         json.loads(GOOGLE_SERVICE_ACCOUNT_JSON)
     )
 elif CLOUD_FILE_NAME:
-    # Local development — load from file
     GS_CREDENTIALS = service_account.Credentials.from_service_account_file(
         os.path.join(BASE_DIR, CLOUD_FILE_NAME)
     )
@@ -52,7 +50,8 @@ STORAGES = {
         },
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        # ✅ Whitenoise serves static files (admin CSS, JS) in production
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 
@@ -122,18 +121,17 @@ CORS_ALLOW_HEADERS = [
     "Access-Control-Allow-Origin",
 ]
 
-REST_FRAMEWORK = {'DEFAULT_SCHEMA_CLASS':'drf_spectacular.openapi.AutoSchema','DEFAULT_AUTHENTICATION_CLASSES': (
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
         'config.authentication.CookieJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-    'rest_framework.permissions.IsAuthenticated',
-),
-
-    }
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+}
 
 CORS_ALLOW_CREDENTIALS = True
-
-
 
 
 # --------------------
@@ -142,7 +140,7 @@ CORS_ALLOW_CREDENTIALS = True
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
-    # ❌ WhiteNoise removed for dev
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # ✅ Serves /static/ files via Whitenoise
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -150,7 +148,6 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
-
 
 
 CSRF_COOKIE_SAMESITE = "None"
@@ -179,20 +176,19 @@ TEMPLATES = [
 ]
 
 
-
 WSGI_APPLICATION = "config.wsgi.application"
 
 # --------------------
 # DATABASE
 # --------------------
-if DEBUG:  # Local development
+if DEBUG:
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
-else:  # Production
+else:
     DATABASES = {
         "default": dj_database_url.config(
             default=os.getenv("DATABASE_URL"),
@@ -200,6 +196,7 @@ else:  # Production
             ssl_require=True
         )
     }
+
 # --------------------
 # STATIC FILES
 # --------------------
@@ -211,6 +208,3 @@ STATICFILES_DIRS = []
 # CORS
 # --------------------
 CORS_ALLOW_ALL_ORIGINS = False
-
-
-
