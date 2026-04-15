@@ -107,13 +107,13 @@ SIMPLE_JWT = {
 }
 
 
-CORS_ALLOWED_ORIGINS = [
-    os.getenv("CORS_ALLOWED_ORIGINS"),
-]
-
-CSRF_TRUSTED_ORIGINS = [
+CSRF_TRUSTED_ORIGINS = list(filter(None, [
     os.getenv("CSRF_TRUSTED_ORIGINS"),
-]
+]))
+
+CORS_ALLOWED_ORIGINS = list(filter(None, [
+    os.getenv("CORS_ALLOWED_ORIGINS"),
+]))
 
 CORS_ALLOW_HEADERS = [
     "authorization",
