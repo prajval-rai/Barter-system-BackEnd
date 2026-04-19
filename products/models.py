@@ -22,7 +22,7 @@ class Product(models.Model):
     description = models.TextField()
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True)
 
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="Submitted")
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="submitted")
 
     created_at = models.DateTimeField(auto_now_add=True)
 
