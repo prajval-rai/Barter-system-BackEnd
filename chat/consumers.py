@@ -15,15 +15,36 @@ logger = logging.getLogger(__name__)
 #  group.  Call this from anywhere (save_message, mark_seen, etc.)
 # ─────────────────────────────────────────────────────────────────────────────
 
+@database_sync_to_async
+def _get_unread_counts_per_chat(user_email: str) -> dict:
+    from chat.models import ChatMessage
+    from barter.models import BarterRequest
+    from django.db.models import Count, Q
+
+    active_request_ids = BarterRequest.objects.filter(
+        status="accepted"
+    ).filter(
+        Q(from_user__email=user_email) | Q(to_user__email=user_email)
+    ).values_list("id", flat=True)
+
+    counts = (
+        ChatMessage.objects
+        .filter(
+            barter_request_id__in=active_request_ids,  # ← use barter_request_id
+            seen=False,
+        )
+        .exclude(sender__email=user_email)
+        .values('barter_request_id')
+        .annotate(count=Count('id'))
+    )
+
+    return {str(row['barter_request_id']): row['count'] for row in counts}
+
 async def push_unread_count(channel_layer, user_email: str):
-    """
-    Compute the total unread chat messages for `user_email` and broadcast
-    it to that user's personal group so every open tab / sidebar gets it.
-    """
-    count = await _get_unread_count(user_email)
+    counts = await _get_unread_counts_per_chat(user_email)  # dict {req_id: count}
     await channel_layer.group_send(
         _unread_group(user_email),
-        {"type": "unread_count_update", "count": count},
+        {"type": "unread_count_update", "counts": counts},
     )
 
 
@@ -302,19 +323,24 @@ class UnreadCountConsumer(AsyncWebsocketConsumer):
             await self.close()
             return
 
-        self.user_email  = user.email
-        self.user_group  = _unread_group(self.user_email)
+        self.user_email = user.email
+        self.user_group = _unread_group(self.user_email)
 
         await self.channel_layer.group_add(self.user_group, self.channel_name)
         await self.accept()
 
-        # Send the current count immediately on connect
-        count = await _get_unread_count(self.user_email)
+        # Send per-chat counts immediately on connect
+        counts = await _get_unread_counts_per_chat(self.user_email)
         await self.send(text_data=json.dumps({
-            "type":  "unread_count",
-            "count": count,
+            "type":   "unread_counts",   # note: plural
+            "counts": counts,
         }))
 
+async def unread_count_update(self, event):
+    await self.send(text_data=json.dumps({
+        "type":   "unread_counts",
+        "counts": event["counts"],
+    }))
     async def disconnect(self, code):
         if hasattr(self, "user_group"):
             await self.channel_layer.group_discard(self.user_group, self.channel_name)
