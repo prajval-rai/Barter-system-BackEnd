@@ -67,116 +67,133 @@ def category_detail(request, pk):
 @transaction.atomic
 def create_product(request):
     try:
-        # -------------------------
-        # 1️⃣ CREATE PRODUCT
-        # -------------------------
-
+        # Create Product
         product_serializer = ProductSerializer(
-            data=request.data, 
-            context={'request': request}  # ✅ Pass request to fix KeyError
+            data=request.data,
+            context={'request': request}
         )
         product_serializer.is_valid(raise_exception=True)
         product = product_serializer.save(owner=request.user)
 
-        # -------------------------
-        # 2️⃣ ADD REPLACE OPTIONS
-        # -------------------------
-
-        replace_options_raw = request.data.get("replace_options")
-        if replace_options_raw:
-            try:
-                replace_options = json.loads(replace_options_raw)
-            except json.JSONDecodeError:
-                return Response(
-                    {"error": "Invalid replace_options JSON"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            if not isinstance(replace_options, list):
-                return Response(
-                    {"error": "replace_options must be a list"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            objects_to_create = []
-            for item in replace_options:
-                serializer = ReplaceOptionSerializer(
-                    data=item,
-                    context={'request': request}  # ✅ Pass request context here too
-                )
-                serializer.is_valid(raise_exception=True)
-                v = serializer.validated_data
-
-                objects_to_create.append(
-                    ReplaceOption(
-                        product=product,
-                        replace_type=v.get("replace_type"),
-                        title=v.get("title", ""),
-                        description=v.get("description", ""),
-                        category=v.get("category"),
-                        point_value=v.get("point_value"),
-                        meta=v.get("meta", {})
-                    )
-                )
-
-            ReplaceOption.objects.bulk_create(objects_to_create)
-
-        # -------------------------
-        # 3️⃣ ADD THUMBNAIL
-        # -------------------------
-
-        
-        product.save()
-
-        # -------------------------
-        # 4️⃣ ADD IMAGES
-        # -------------------------
-
+        # Add Images
         images = request.FILES.getlist('images')
         for f in images:
             ProductImage.objects.create(product=product, image=f)
 
+        # Send WhatsApp notification
         phone = request.user.userprofile.contact_number
         if phone:
-            phone = f"+91{phone}"  # important for Twilio
-
+            phone = f"+91{phone}"
             message = (
-    f"🎉 *Product Listed Successfully!*\n\n"
-    f"Hey *{request.user.username}* 👋\n\n"
-    f"Your product is now *live* and under review by our team.\n\n"
-    f"━━━━━━━━━━━━━━━━\n"
-    f"📦 *Product:* {product.title}\n"
-    f"📌 *Status:* Under Review 🔍\n"
-    f"━━━━━━━━━━━━━━━━\n\n"
-    f"⏳ *What happens next?*\n"
-    f"  • Our team will review your listing\n"
-    f"  • Once approved, it becomes visible to all users\n"
-    f"  • You'll get notified the moment someone matches your exchange!\n\n"
-    f"💡 *Pro Tip:* Make sure your product images are clear and "
-    f"your exchange options are accurate for faster approval.\n\n"
-    f"🤝 Happy Trading & Best of Luck!\n\n"
-    f"_– BarterApp Team_ 🛍️"
-)
-
+                f"🎉 *Product Listed Successfully!*\n\n"
+                f"Hey *{request.user.username}* 👋\n\n"
+                f"Your product is now *live* and under review by our team.\n\n"
+                f"━━━━━━━━━━━━━━━━\n"
+                f"📦 *Product:* {product.title}\n"
+                f"📌 *Status:* Under Review 🔍\n"
+                f"━━━━━━━━━━━━━━━━\n\n"
+                f"⏳ *What happens next?*\n"
+                f"  • Our team will review your listing\n"
+                f"  • Once approved, it becomes visible to all users\n"
+                f"  • You'll get notified the moment someone matches your exchange!\n\n"
+                f"💡 *Pro Tip:* Make sure your product images are clear and "
+                f"your exchange options are accurate for faster approval.\n\n"
+                f"🤝 Happy Trading & Best of Luck!\n\n"
+                f"_– BarterApp Team_ 🛍️"
+            )
             send_whatsapp_message(phone, message)
-
 
         return Response(
             {
                 "success": True,
                 "product_id": product.id,
-                "message": "Product created successfully"
+                "message": "Product created successfully. Now add your replace options."
             },
             status=status.HTTP_201_CREATED
         )
 
     except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@transaction.atomic
+def add_replace_options(request, product_id):
+    try:
+        # Fetch product and verify ownership
+        try:
+            product = Product.objects.get(id=product_id, owner=request.user)
+        except Product.DoesNotExist:
+            return Response(
+                {"error": "Product not found or you don't have permission to edit it."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        replace_options_raw = request.data.get("replace_options")
+        if not replace_options_raw:
+            return Response(
+                {"error": "replace_options is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Parse JSON if sent as string (e.g., from multipart form)
+        if isinstance(replace_options_raw, str):
+            try:
+                replace_options = json.loads(replace_options_raw)
+            except json.JSONDecodeError:
+                return Response(
+                    {"error": "Invalid replace_options JSON."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            replace_options = replace_options_raw
+
+        if not isinstance(replace_options, list):
+            return Response(
+                {"error": "replace_options must be a list."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Optional: clear existing replace options before adding new ones
+        # ReplaceOption.objects.filter(product=product).delete()
+
+        objects_to_create = []
+        for item in replace_options:
+            serializer = ReplaceOptionSerializer(
+                data=item,
+                context={'request': request}
+            )
+            serializer.is_valid(raise_exception=True)
+            v = serializer.validated_data
+
+            objects_to_create.append(
+                ReplaceOption(
+                    product=product,
+                    replace_type=v.get("replace_type"),
+                    title=v.get("title", ""),
+                    description=v.get("description", ""),
+                    category=v.get("category"),
+                    point_value=v.get("point_value"),
+                    meta=v.get("meta", {})
+                )
+            )
+
+        ReplaceOption.objects.bulk_create(objects_to_create)
+
         return Response(
-            {"error": str(e)},
-            status=status.HTTP_400_BAD_REQUEST
+            {
+                "success": True,
+                "product_id": product.id,
+                "replace_options_added": len(objects_to_create),
+                "message": "Replace options added successfully."
+            },
+            status=status.HTTP_201_CREATED
         )
 
-
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 
@@ -515,6 +532,21 @@ def products_by_status(request):
     products = Product.objects.filter(owner=request.user,status=status_param).order_by('-created_at')
     serializer = GetProductSerializer(products, many=True)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def product_dropdown(request):
+    try:
+        products = Product.objects.filter(owner=request.user).values('id', 'title')
+        return Response(
+            {
+                "success": True,
+                "products": list(products)
+            },
+            status=status.HTTP_200_OK
+        )
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])

@@ -18,7 +18,9 @@ from .views import (
     admin_products_by_status,
     change_product_status,
     marketplace,
-    my_product
+    my_product,
+    product_dropdown,
+    add_replace_options
 )
 
 urlpatterns = [
@@ -30,6 +32,8 @@ urlpatterns = [
     
 
     path('create_product/', create_product, name='create_product'),
+    path('add_replace_options/<int:product_id>/', add_replace_options, name='add_replace_options'),
+    path('product_dropdown/', product_dropdown, name='product_dropdown'),
     path('', product_list_create, name='product-list-create'),
     path('<int:pk>/', product_detail, name='product-detail'),
     path('<int:product_id>/replace-options/bulk/', add_replace_options_bulk, name='replace-options'),

@@ -17,6 +17,13 @@ class Product(models.Model):
         ("banned", "Banned"),
     )
 
+    CONDITION_CHOICE = (
+        ("Brand New","Brand New"),
+        ("Line New","Like New"),
+        ("Good","Good"),
+        ("Fair","Fair")
+    )
+
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name="products")
     title = models.CharField(max_length=255)
     description = models.TextField()
@@ -29,6 +36,8 @@ class Product(models.Model):
     purchase_bill = models.FileField(upload_to="product_bill/", null=True, blank=True)
 
     purchase_year = models.IntegerField(null=True,blank=True)
+
+    condition = models.CharField(max_length=20,choices=CONDITION_CHOICE,null=True,blank=True)
 
 
     def __str__(self):
