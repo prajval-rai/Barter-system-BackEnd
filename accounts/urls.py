@@ -13,4 +13,6 @@ urlpatterns = [
     path('notifications/<int:pk>/read/', mark_notification_read),
     path('notifications/read-all/', mark_all_read),
     path('notifications/unread-count/', unread_count),
+    path('notifications/send-notification/', send_test_notification),
+
 ]

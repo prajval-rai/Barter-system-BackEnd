@@ -1,5 +1,9 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 class UserProfile(models.Model):
     ROLE_CHOICES = (
@@ -27,3 +31,16 @@ class UserNotification(models.Model):
     description = models.TextField()
     redirect = models.CharField(max_length=30)
     staus = models.BooleanField(default=False)
+
+
+class FCMToken(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="fcm_tokens")
+    token = models.TextField(unique=True)
+    device_type = models.CharField(
+        max_length=20,
+        choices=[("android", "Android"), ("ios", "iOS"), ("web", "Web")]
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user} - {self.device_type}"

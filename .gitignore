@@ -76,4 +76,5 @@ logs/
 
 # Misc
 *.sqlite3
+firebase-credentials.json
 *.db

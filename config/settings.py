@@ -5,9 +5,17 @@ from google.oauth2 import service_account
 import dj_database_url
 from datetime import timedelta
 import json
+import firebase_admin
+from firebase_admin import credentials
 
 
 load_dotenv()
+
+
+if not firebase_admin._apps:
+    firebase_credentials = json.loads(os.getenv("FIREBASE_CREDENTIALS_JSON"))
+    cred = credentials.Certificate(firebase_credentials)
+    firebase_admin.initialize_app(cred)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

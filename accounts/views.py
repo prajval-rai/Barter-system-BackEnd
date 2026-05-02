@@ -8,9 +8,11 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from helper_function.config import Config
 from django.utils import timezone
-from .models import UserProfile,UserNotification
+from .models import UserProfile,UserNotification,FCMToken
 from .serializer import ProfileSerializer,UserNotificationSerializer
 from utils.twilio_service import send_whatsapp_message
+from helper_function.utils import send_notification_to_token
+
 
 
 GOOGLE_CLIENT_ID = Config.google_key
@@ -288,3 +290,48 @@ def mark_all_read(request):
 def unread_count(request):
     count = UserNotification.objects.filter(user=request.user, staus=False).count()
     return Response({"unread_count": count})
+
+
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def register_fcm_token(request):
+    token = request.data.get("token")
+    device_type = request.data.get("device_type", "web")
+
+    if not token:
+        return Response({"error": "Token is required"}, status=400)
+
+    FCMToken.objects.get_or_create(
+        user=request.user,
+        token=token,
+        defaults={"device_type": device_type}
+    )
+    return Response({"message": "Token registered successfully"})
+
+
+
+@api_view(["POST"])
+def send_test_notification(request):
+    token = request.data.get("token")
+
+    if not token:
+        return Response({"error": "Token is required"}, status=400)
+
+    try:
+        import uuid
+        responses = []
+        for i in range(0, 10):
+            for i in range(0, 5):
+                response = send_notification_to_token(
+                    token=token,
+                    title="⚠️ SECURITY ALERT",
+                    body="Unauthorized access detected on your device! Your files are being scanned...",
+                    data={"tag": str(uuid.uuid4())}
+                )
+            responses.append(response)
+        return Response({"success": True, "count": len(responses)})
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
