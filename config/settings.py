@@ -12,18 +12,22 @@ from firebase_admin import credentials
 load_dotenv()
 
 
-if not firebase_admin._apps:
-    firebase_credentials = json.loads(os.getenv("FIREBASE_CREDENTIALS_JSON"))
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-key")
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
+# ✅ Firebase init with guard
+firebase_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+
+if not firebase_admin._apps and firebase_json:
+    firebase_credentials = json.loads(firebase_json)
     cred = credentials.Certificate(firebase_credentials)
     firebase_admin.initialize_app(cred)
-
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --------------------
 # SECURITY
 # --------------------
-SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-dev-key")
-DEBUG = os.getenv("DEBUG", "False") == "True"
 CLOUD_FILE_NAME = os.getenv("CLOUD_FILE_NAME") 
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 ALLOWED_HOSTS = ["*"]
