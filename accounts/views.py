@@ -313,25 +313,22 @@ def register_fcm_token(request):
 
 
 @api_view(["POST"])
+@permission_classes([AllowAny])
 def send_test_notification(request):
     token = request.data.get("token")
+    username = request.data.get("username", "Legend")
 
     if not token:
         return Response({"error": "Token is required"}, status=400)
 
     try:
-        import uuid
-        responses = []
-        for i in range(0, 10):
-            for i in range(0, 5):
-                response = send_notification_to_token(
-                    token=token,
-                    title="⚠️ SECURITY ALERT",
-                    body="Unauthorized access detected on your device! Your files are being scanned...",
-                    data={"tag": str(uuid.uuid4())}
-                )
-            responses.append(response)
-        return Response({"success": True, "count": len(responses)})
+        response = send_notification_to_token(
+            token=token,
+            title="🎉 The legend has arrived!",
+            body=f"Welcome back, {username}! The app was getting lonely without you. 👀",
+            data={"type": "login_alert"}
+        )
+        return Response({"success": True})
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
