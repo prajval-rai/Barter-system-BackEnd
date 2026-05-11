@@ -14,10 +14,12 @@ class BarterRequestCreateSerializer(serializers.ModelSerializer):
 class ProductBasicSerializer(serializers.ModelSerializer):
 
     thumbnail = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source="category.name", read_only=True)
+
 
     class Meta:
         model = Product
-        fields = ["id", "title", "thumbnail"]
+        fields = ["id", "title", "thumbnail","status",'category_name']
 
     def get_thumbnail(self, obj):
         image = obj.images.first()

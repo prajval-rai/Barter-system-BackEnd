@@ -385,3 +385,315 @@ def scan_product(request, product_id):
         [serialize_match(p, d, s, b) for p, d, s, b in results],
         status=status.HTTP_200_OK,
     )
+
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# GET /products/nearby/?radius=<km>&limit=<n>
+# ════════════════════════════════════════════════════════════════════════════
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def nearby_products(request):
+    """
+    Returns nearby approved products sorted by distance.
+
+    Query params:
+      radius  (float km, default 10, max 200)
+      limit   (int,      default 4,  max 50)
+    """
+
+    # ── 1. Get requester's location ──────────────────────────────────────────
+    try:
+        profile = UserProfile.objects.get(user=request.user)
+    except UserProfile.DoesNotExist:
+        return Response(
+            {"error": "Profile not found. Please complete your profile."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if profile.latitude is None or profile.longitude is None:
+        return Response(
+            {"error": "Please add your location in your profile before scanning."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    my_lat = float(profile.latitude)
+    my_lng = float(profile.longitude)
+
+    # ── 2. Query params ──────────────────────────────────────────────────────
+    try:
+        radius_km = min(float(request.query_params.get("radius", 10)), 200)
+        if radius_km <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return Response(
+            {"error": "Invalid radius. Must be a positive number (max 200 km)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    try:
+        limit = min(int(request.query_params.get("limit", 4)), 50)
+        if limit <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return Response(
+            {"error": "Invalid limit. Must be a positive integer (max 50)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # ── 3. Fetch approved products (exclude own) ─────────────────────────────
+    candidates = (
+        Product.objects
+        .filter(status="approved")
+        .exclude(owner=request.user)
+        .select_related("owner", "category")
+        .prefetch_related("images")
+    )
+
+    # ── 4. Build owner → profile map ─────────────────────────────────────────
+    owner_ids   = candidates.values_list("owner_id", flat=True).distinct()
+    profile_map = {
+        p.user_id: p
+        for p in UserProfile.objects.filter(
+            user_id__in=owner_ids,
+            latitude__isnull=False,
+            longitude__isnull=False,
+        )
+    }
+
+    # ── 5. Distance filter ───────────────────────────────────────────────────
+    nearby = []
+    for product in candidates:
+        owner_profile = profile_map.get(product.owner_id)
+        if not owner_profile:
+            continue
+
+        dist_km = haversine(
+            my_lat, my_lng,
+            float(owner_profile.latitude),
+            float(owner_profile.longitude),
+        )
+
+        if dist_km <= radius_km:
+            nearby.append((product, dist_km))
+
+    # ── 6. Sort by distance ASC, take top N ──────────────────────────────────
+    nearby.sort(key=lambda x: x[1])
+    nearby = nearby[:limit]
+
+    # ── 7. Serialize ─────────────────────────────────────────────────────────
+    def serialize(product, dist_km):
+        image = product.images.first()
+        thumbnail = image.image.url if image else None
+
+        return {
+            "id":            product.id,
+            "title":         product.title,
+            "thumbnail":     thumbnail,
+            "category_name": product.category.name if product.category else None,
+            "status":        product.status,
+            "distance_km":   round(dist_km, 2),
+            "owner": {
+                "id":       product.owner.id,
+                "username": product.owner.username,
+            },
+        }
+
+    return Response(
+        [serialize(p, d) for p, d in nearby],
+        status=status.HTTP_200_OK,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def scan_all_my_products(request):
+    """
+    Scans nearby approved products matching ANY of the user's own products.
+
+    Query params:
+      radius    (float km, default 10, max 200)
+      min_score (int 0-100, default 0)
+      limit     (int,       default 20, max 100)
+    """
+
+    # ── 1. Owner location ────────────────────────────────────────────────────
+    try:
+        owner_profile = UserProfile.objects.get(user=request.user)
+    except UserProfile.DoesNotExist:
+        return Response(
+            {"error": "Profile not found. Please complete your profile."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    if owner_profile.latitude is None or owner_profile.longitude is None:
+        return Response(
+            {"error": "Please add your location in your profile before scanning."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    owner_lat = float(owner_profile.latitude)
+    owner_lng = float(owner_profile.longitude)
+
+    # ── 2. Query params ──────────────────────────────────────────────────────
+    try:
+        radius_km = min(float(request.query_params.get("radius", 10)), 200)
+        if radius_km <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return Response(
+            {"error": "Invalid radius. Must be a positive number (max 200 km)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    min_score = max(0, min(int(request.query_params.get("min_score", 0)), 100))
+
+    try:
+        limit = min(int(request.query_params.get("limit", 20)), 100)
+        if limit <= 0:
+            raise ValueError
+    except (TypeError, ValueError):
+        return Response(
+            {"error": "Invalid limit. Must be a positive integer (max 100)."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # ── 3. Fetch all my products with their replace_options AND images ────────
+    my_products = (
+        Product.objects
+        .filter(owner=request.user, status="approved")
+        .select_related("category")
+        .prefetch_related("replace_options__category", "images")  # ← "images" added
+    )
+
+    if not my_products.exists():
+        return Response(
+            {"error": "You have no approved products to scan from."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # ── 4. Collect all replace_options across all my products ────────────────
+    # Map: replace_option → which of my products it belongs to
+    option_to_my_product = {}
+    all_replace_options = []
+
+    for my_product in my_products:
+        opts = list(my_product.replace_options.select_related("category"))
+        for opt in opts:
+            option_to_my_product[opt.id] = my_product
+            all_replace_options.append(opt)
+
+    if not all_replace_options:
+        return Response(
+            {"error": "None of your products have exchange preferences set."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    # ── 5. Build keyword query across ALL replace options ────────────────────
+    keyword_q = Q()
+    for opt in all_replace_options:
+        for kw in extract_keywords(opt.title or ""):
+            keyword_q |= Q(title__icontains=kw)
+            keyword_q |= Q(description__icontains=kw)
+        for kw in extract_keywords(opt.description or ""):
+            keyword_q |= Q(title__icontains=kw)
+            keyword_q |= Q(description__icontains=kw)
+        if opt.category_id:
+            keyword_q |= Q(category_id=opt.category_id)
+
+    if not keyword_q:
+        return Response([], status=status.HTTP_200_OK)
+
+    candidates = (
+        Product.objects
+        .filter(keyword_q, status="approved")
+        .exclude(owner=request.user)
+        .select_related("owner", "category")
+        .prefetch_related("replace_options", "images")
+        .distinct()
+    )
+
+    # ── 6. Build owner → profile map ─────────────────────────────────────────
+    owner_ids   = candidates.values_list("owner_id", flat=True).distinct()
+    profile_map = {
+        p.user_id: p
+        for p in UserProfile.objects.filter(
+            user_id__in=owner_ids,
+            latitude__isnull=False,
+            longitude__isnull=False,
+        )
+    }
+
+    # ── 7. Score each candidate against ALL my products ──────────────────────
+    seen = {}  # candidate_id → best result so far
+
+    for candidate in candidates:
+        profile = profile_map.get(candidate.owner_id)
+        if not profile:
+            continue
+
+        dist_km = haversine(
+            owner_lat, owner_lng,
+            float(profile.latitude),
+            float(profile.longitude),
+        )
+
+        if dist_km > radius_km:
+            continue
+
+        best_score      = -1
+        best_breakdown  = {}
+        best_my_product = None
+
+        for my_product in my_products:
+            my_opts = list(my_product.replace_options.all())
+            if not my_opts:
+                continue
+
+            score, breakdown = compute_match(candidate, my_opts, radius_km, dist_km)
+
+            if score > best_score:
+                best_score      = score
+                best_breakdown  = breakdown
+                best_my_product = my_product
+
+        if best_score < min_score or best_my_product is None:
+            continue
+
+        if candidate.id not in seen or best_score > seen[candidate.id][2]:
+            seen[candidate.id] = (candidate, dist_km, best_score, best_breakdown, best_my_product)
+
+    # ── 8. Sort: score DESC, distance ASC ────────────────────────────────────
+    results = sorted(seen.values(), key=lambda x: (-x[2], x[1]))[:limit]
+
+    # ── 9. Serialize ─────────────────────────────────────────────────────────
+    def serialize(candidate, dist_km, score, breakdown, matched_my_product):
+        # "YOU GET" — candidate's own image
+        candidate_image = candidate.images.first()
+        thumbnail = candidate_image.image.url if candidate_image else None
+
+        # "YOU GIVE" — your own matched product's image
+        my_image = matched_my_product.images.first()
+        my_product_thumbnail = my_image.image.url if my_image else None
+
+        # replace_options on matched_my_product are plain title strings
+        replace_options = [
+            opt.title
+            for opt in matched_my_product.replace_options.all()
+        ]
+
+        return {
+            **serialize_match(candidate, dist_km, score, breakdown),
+            "thumbnail":            thumbnail,            # candidate's image — "YOU GET"
+            "my_product_thumbnail": my_product_thumbnail, # your product's image — "YOU GIVE"
+            "replace_options":      replace_options,
+            "matched_via": {
+                "id":    matched_my_product.id,
+                "title": matched_my_product.title,
+            },
+        }
+
+    return Response(
+        [serialize(c, d, s, b, mp) for c, d, s, b, mp in results],
+        status=status.HTTP_200_OK,
+    )
