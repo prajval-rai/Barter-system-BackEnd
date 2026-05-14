@@ -19,7 +19,7 @@ class ProductBasicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        fields = ["id", "title", "thumbnail","status",'category_name']
+        fields = ["id", "title", "thumbnail","status",'category_name','created_at']
 
     def get_thumbnail(self, obj):
         image = obj.images.first()

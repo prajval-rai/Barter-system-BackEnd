@@ -176,7 +176,8 @@ def add_replace_options(request, product_id):
                     description=v.get("description", ""),
                     category=v.get("category"),
                     point_value=v.get("point_value"),
-                    meta=v.get("meta", {})
+                    meta=v.get("meta", {}),
+                    icon = v.get("icon","")
                 )
             )
 
@@ -790,7 +791,7 @@ def marketplace(request):
 @permission_classes([IsAuthenticated])
 def my_product(request):
     try:
-        product_obj = Product.objects.filter(owner=request.user.id,status="approved")
+        product_obj = Product.objects.filter(owner=request.user.id).order_by('-id')
         product_basic = ProductBasicSerializer(product_obj,many=True,context={"request": request}).data
         return Response(product_basic)
 

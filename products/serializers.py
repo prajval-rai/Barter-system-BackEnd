@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Product, ProductImage, Category
 from barter.models import ReplaceOption
+from django.contrib.auth.models import User
 
 
 # -----------------------
@@ -69,57 +70,75 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'image', 'created_at', 'product']
         read_only_fields = ['created_at', 'product']
         
-class ProductSerializer(serializers.ModelSerializer):
-    replace_options = ReplaceOptionSerializer(many=True,write_only=True,required=False)
-    product_replace_options = serializers.SerializerMethodField()
-    images = ProductImageSerializer(
-        many=True, read_only=True
-    )  # 👈 THIS LINE
-    category_id = serializers.PrimaryKeyRelatedField(
-        queryset=Category.objects.all(),
-        source='category',
-        write_only=True
-    )
-    category = CategorySerializer(read_only=True)
+class OwnerSerializer(serializers.ModelSerializer):
+    address        = serializers.SerializerMethodField()
+    rating         = serializers.SerializerMethodField()
+    description    = serializers.SerializerMethodField()
 
     class Meta:
-        model = Product
+        model  = User
+        fields = ["id"
+                  , "address", "rating", "description"]
+
+    def get_contact_number(self, obj):
+        try: return obj.userprofile.contact_number
+        except: return None
+
+    def get_address(self, obj):
+        try: return obj.userprofile.address
+        except: return None
+
+    def get_rating(self, obj):
+        try: return obj.userprofile.rating
+        except: return None
+
+    def get_description(self, obj):
+        try: return obj.userprofile.description
+        except: return None
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    replace_options         = ReplaceOptionSerializer(many=True, write_only=True, required=False)
+    product_replace_options = serializers.SerializerMethodField()
+    images                  = ProductImageSerializer(many=True, read_only=True)
+    category_id             = serializers.PrimaryKeyRelatedField(
+                                queryset=Category.objects.all(),
+                                source='category',
+                                write_only=True
+                              )
+    category                = CategorySerializer(read_only=True)
+    owner                   = OwnerSerializer(read_only=True)   # ← added
+
+    class Meta:
+        model  = Product
         fields = [
-            'id', 'title', 'description', 'category', 'category_id',"images",
-             'status', 'created_at','replace_options','product_replace_options',
-             'purchase_year','purchase_bill'
+            'id', 'title', 'description', 'category', 'category_id', 'images',
+            'status', 'created_at', 'replace_options', 'product_replace_options',
+            'purchase_year', 'purchase_bill',
+            'owner',                                               # ← added
         ]
         read_only_fields = ['status', 'created_at']
-    
+
     def get_product_replace_options(self, obj):
         return ReplaceOptionSerializer(obj.replace_options.all(), many=True).data
 
     def create(self, validated_data):
         category = validated_data.pop('category', None)
-
         product_kwargs = {
             'owner': self.context['request'].user,
             'category': category,
         }
-        
-
         product_kwargs.update(validated_data)
         return Product.objects.create(**product_kwargs)
 
     def update(self, instance, validated_data):
         category = validated_data.pop('category', None)
-
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-
         if category:
             instance.category = category
-    
-
         instance.save()
         return instance
-
-
 
 
 
