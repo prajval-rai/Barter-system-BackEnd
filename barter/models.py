@@ -24,6 +24,9 @@ class ReplaceOption(models.Model):
         if self.replace_type == "product":
             return f"{self.product.title} → {self.title}"
         return f"{self.product.title} → {self.point_value} pts"
+    
+
+    
 
 
 

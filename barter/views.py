@@ -271,3 +271,44 @@ def is_saved(request):
     ).exists()
 
     return Response({"is_saved": exists})
+
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def rejected_barter_requests(request):
+    rejected_requests = BarterRequest.objects.filter(
+        status="rejected"
+    ).filter(
+        Q(from_user=request.user) | Q(to_user=request.user)
+    ).select_related(
+        "from_user", "to_user", "request_product", "request_for_product"
+    )
+
+    serializer = BarterRequestSerializer(rejected_requests, many=True, context={'request': request})
+    return Response({
+        "status": "success",
+        "count": rejected_requests.count(),
+        "data": serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def completed_barter_requests(request):
+    completed_requests = BarterRequest.objects.filter(
+        status="completed"
+    ).filter(
+        Q(from_user=request.user) | Q(to_user=request.user)
+    ).select_related(
+        "from_user", "to_user", "request_product", "request_for_product"
+    )
+
+    serializer = BarterRequestSerializer(completed_requests, many=True, context={'request': request})
+    return Response({
+        "status": "success",
+        "count": completed_requests.count(),
+        "data": serializer.data
+    }, status=status.HTTP_200_OK)

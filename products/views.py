@@ -3,9 +3,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Product, ProductImage, Category
-from .serializers import ProductSerializer, CategorySerializer,ProductImageSerializer,ReplaceOptionSerializer,ProductListSerializer,GetProductSerializer,MarketplaceProductSerializer
-from rest_framework.parsers import MultiPartParser, FormParser
+from .models import Product, ProductImage, Category,BookMarkProduct
+from .serializers import *
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
@@ -391,19 +390,20 @@ def product_detail(request, pk):
         return Response({"error": "Product not found"}, status=status.HTTP_404_NOT_FOUND)
 
     if request.method == 'GET':
-        serializer = ProductSerializer(product)
+        serializer = ProductSerializer(product, context={'request': request})  # ← fixed
         return Response(serializer.data)
+
     elif request.method == 'PUT':
         serializer = ProductSerializer(product, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     elif request.method == 'DELETE':
         product.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
+    
 # --------------------
 # PRODUCT IMAGE CRUD (Optional: individual image delete)
 # --------------------
@@ -797,3 +797,69 @@ def my_product(request):
 
     except Exception as e:
         return Response({'message':str(e)})
+    
+
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_bookmark(request, product_id):
+    product = get_object_or_404(Product, id=product_id)
+
+    bookmark, created = BookMarkProduct.objects.get_or_create(
+        product=product,
+        user=request.user
+    )
+
+    if not created:
+        bookmark.delete()
+        return Response({
+            "status": "removed",
+            "message": f"{product.title} removed from bookmarks."
+        }, status=status.HTTP_200_OK)
+
+    return Response({
+        "status": "added",
+        "message": f"{product.title} added to bookmarks."
+    }, status=status.HTTP_201_CREATED)
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_bookmarks(request):
+    bookmarks = BookMarkProduct.objects.filter(
+        user=request.user
+    ).select_related('product').order_by('-created_at')
+
+    serializer = BookmarkSerializer(bookmarks, many=True, context={'request': request})
+    return Response({
+        "status": "success",
+        "count": bookmarks.count(),
+        "data": serializer.data
+    }, status=status.HTTP_200_OK)
+
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_bookmark(request, product_id):
+    print("MMMMMMMMMMMMMMMMMMMMMMMMMM")
+    bookmark = BookMarkProduct.objects.filter(
+        product_id=product_id,
+        user=request.user
+    ).first()
+
+    if not bookmark:
+        return Response({
+            "status": "error",
+            "message": "Bookmark not found."
+        }, status=status.HTTP_404_NOT_FOUND)
+
+    bookmark.delete()
+    return Response({
+        "status": "success",
+        "message": "Bookmark removed successfully."
+    }, status=status.HTTP_200_OK)

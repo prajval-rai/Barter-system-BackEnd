@@ -18,5 +18,7 @@ urlpatterns = [
     path('saved-products/<int:pk>/', remove_saved_product),
     path('saved-products/toggle/', toggle_save_product),
     path('saved-products/is-saved/', is_saved),
-
+    path('saved-products/is-saved/', is_saved),
+    path('rejected_barter_requests/',rejected_barter_requests),
+    path('completed_barter_requests/',completed_barter_requests)
 ]

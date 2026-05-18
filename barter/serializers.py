@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import BarterRequest,SaveProducts
-from products.models import Product
+from products.models import Product,ProductImage
 
 class BarterRequestCreateSerializer(serializers.ModelSerializer):
 
@@ -70,3 +70,23 @@ class SaveProductsSerializer(serializers.ModelSerializer):
         model = SaveProducts
         fields = '__all__'
         read_only_fields = ['user', 'created_at']
+
+
+
+class ProductSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+    class Meta:
+        model = Product
+        fields = [
+            "id", "title", "description", "category",
+            "condition", "status", "purchase_year", "image"
+        ]
+    
+    def get_image(self,obj):
+        first_image = obj.images.first()
+        if first_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(first_image.image.url)
+            return first_image.image.url
+        return None

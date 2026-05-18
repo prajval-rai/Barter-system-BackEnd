@@ -1,27 +1,5 @@
 from django.urls import path
-from .views import (
-    category_list_create, category_detail,
-    product_list_create, product_detail,
-    product_image_delete,
-    product_list_create,
-    product_update,
-    product_list_paginated,
-    product_list_by_category,
-    product_list_by_user,
-    upload_product_images,
-    products_grouped_by_category,
-    delete_product,
-    add_replace_options_bulk,
-    create_product,
-    products_by_status,
-    get_product_images,
-    admin_products_by_status,
-    change_product_status,
-    marketplace,
-    my_product,
-    product_dropdown,
-    add_replace_options
-)
+from .views import *
 
 urlpatterns = [
     # Categories
@@ -55,7 +33,10 @@ urlpatterns = [
     path('admin_products_by_status/', admin_products_by_status, name='products_by_status'),
     path('change_product_status/',change_product_status),
     path("marketplace/", marketplace, name="marketplace"),
-    path("my_product/",my_product,name="my_product")
+    path("my_product/",my_product,name="my_product"),
+    path('bookmark/<int:product_id>/',add_bookmark, name='add-bookmark'),
+    path('bookmarks/',get_bookmarks, name='get-bookmarks'),
+    path('bookmark/<int:product_id>/remove/',remove_bookmark,   name='remove-bookmark'),
 
 
 ]

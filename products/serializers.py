@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Product, ProductImage, Category
+from .models import Product, ProductImage, Category,BookMarkProduct
 from barter.models import ReplaceOption
 from django.contrib.auth.models import User
 
@@ -108,6 +108,7 @@ class ProductSerializer(serializers.ModelSerializer):
                               )
     category                = CategorySerializer(read_only=True)
     owner                   = OwnerSerializer(read_only=True)   # ← added
+    is_bookmarked           = serializers.SerializerMethodField()
 
     class Meta:
         model  = Product
@@ -115,7 +116,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'category', 'category_id', 'images',
             'status', 'created_at', 'replace_options', 'product_replace_options',
             'purchase_year', 'purchase_bill',
-            'owner',                                               # ← added
+            'owner','is_bookmarked'                                               # ← added
         ]
         read_only_fields = ['status', 'created_at']
 
@@ -130,6 +131,23 @@ class ProductSerializer(serializers.ModelSerializer):
         }
         product_kwargs.update(validated_data)
         return Product.objects.create(**product_kwargs)
+    
+
+    def get_is_bookmarked(self, obj):
+        request = self.context.get('request')
+        print("REQUEST:", request)               # should NOT be None
+        print("USER:", request.user)             # should be your email
+        print("IS AUTH:", request.user.is_authenticated)  # should be True
+        
+        if request and request.user.is_authenticated:
+            exists = BookMarkProduct.objects.filter(
+                product=obj,
+                user=request.user
+            ).exists()
+            print("EXISTS:", exists)             # check this
+            return exists
+        return False
+    
 
     def update(self, instance, validated_data):
         category = validated_data.pop('category', None)
@@ -216,7 +234,7 @@ class MarketReplaceOptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = ReplaceOption
-        fields = ["id", "replace_type", "title", "description", "category_name", "point_value"]
+        fields = ["id", "replace_type", "title", "description", "category_name","icon"]
 
 
 class MarketplaceProductSerializer(serializers.ModelSerializer):
@@ -224,6 +242,10 @@ class MarketplaceProductSerializer(serializers.ModelSerializer):
     owner_name      = serializers.SerializerMethodField()
     thumbnail       = serializers.SerializerMethodField()
     replace_options = MarketReplaceOptionSerializer(many=True, read_only=True)
+
+    owner_latitude = serializers.SerializerMethodField()
+    owner_longitude = serializers.SerializerMethodField()
+    owner_address = serializers.SerializerMethodField()
 
     class Meta:
         model  = Product
@@ -239,12 +261,33 @@ class MarketplaceProductSerializer(serializers.ModelSerializer):
             "owner_name",
             "thumbnail",
             "replace_options",
+            "owner_latitude",
+            "owner_longitude",
+            "owner_address"
         ]
 
     def get_owner_name(self, obj):
         u = obj.owner
         full = f"{u.first_name} {u.last_name}".strip()
         return full or u.username
+    
+
+    def _get_profile(self,obj):
+        return getattr(obj.owner,"userprofile",None)
+
+
+    def get_owner_latitude(self,obj):
+        profile = self._get_profile(obj)
+        return profile.latitude if profile else None
+    
+    def get_owner_longitude(self,obj):
+        profile = self._get_profile(obj)
+        return profile.longitude if profile else None
+    
+    def get_owner_address(self,obj):
+        profile = self._get_profile(obj)
+        return profile.address if profile else None
+    
 
     def get_thumbnail(self, obj):
         request = self.context.get("request")
@@ -260,4 +303,27 @@ class MarketplaceProductSerializer(serializers.ModelSerializer):
             return None
         
 
-        
+
+class BookmarkSerializer(serializers.ModelSerializer):
+    title = serializers.CharField(source='product.title')
+    category = serializers.CharField(source='product.category.name', default=None)
+    condition = serializers.CharField(source='product.condition')
+    product_status = serializers.CharField(source='product.status')
+    thumbnail = serializers.SerializerMethodField()
+    product_id = serializers.IntegerField(source='product.id')
+
+    class Meta:
+        model = BookMarkProduct
+        fields = [
+            'id', 'product_id', 'title', 'category',
+            'condition', 'product_status', 'thumbnail', 'created_at'
+        ]
+
+    def get_thumbnail(self, obj):
+        first_image = obj.product.images.first()
+        if first_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(first_image.image.url)
+            return first_image.image.url
+        return None
