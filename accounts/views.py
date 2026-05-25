@@ -130,9 +130,9 @@ def google_login(request):
 
         return response
 
-    except ValueError:
+    except ValueError as e:
         return Response(
-            {"error": "Invalid Google token"},
+            {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
 

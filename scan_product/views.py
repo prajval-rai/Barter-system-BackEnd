@@ -592,14 +592,21 @@ def scan_all_my_products(request):
     # ── 5. Build keyword query across ALL replace options ────────────────────
     keyword_q = Q()
     for opt in all_replace_options:
-        for kw in extract_keywords(opt.title or ""):
+        raw_title = (opt.title or "").strip()
+        
+        # Match full phrase
+        keyword_q |= Q(title__icontains=raw_title)
+        
+        # Match without spaces (JBL Head Phone → JBLHeadPhone — no, but:)
+        # Match each word individually  
+        for kw in extract_keywords(raw_title):
             keyword_q |= Q(title__icontains=kw)
-            keyword_q |= Q(description__icontains=kw)
-        for kw in extract_keywords(opt.description or ""):
-            keyword_q |= Q(title__icontains=kw)
-            keyword_q |= Q(description__icontains=kw)
-        if opt.category_id:
-            keyword_q |= Q(category_id=opt.category_id)
+        
+        # ← KEY FIX: also try concatenated pairs
+        words = raw_title.split()
+        for i in range(len(words) - 1):
+            compound = words[i] + words[i+1]          # "Head"+"Phone" = "HeadPhone"
+            keyword_q |= Q(title__icontains=compound)  # matches "Headphone"
 
     if not keyword_q:
         return Response([], status=status.HTTP_200_OK)
@@ -697,3 +704,106 @@ def scan_all_my_products(request):
         [serialize(c, d, s, b, mp) for c, d, s, b, mp in results],
         status=status.HTTP_200_OK,
     )
+
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def debug_scan(request):
+    
+    # Step 1: Check profile
+    try:
+        owner_profile = UserProfile.objects.get(user=request.user)
+        profile_data = {
+            "lat": str(owner_profile.latitude),
+            "lng": str(owner_profile.longitude),
+        }
+    except UserProfile.DoesNotExist:
+        return Response({"error": "No profile"})
+
+    # Step 2: My products
+    my_products = Product.objects.filter(owner=request.user, status="approved").prefetch_related("replace_options__category", "images")
+    my_products_data = [
+        {
+            "id": p.id,
+            "title": p.title,
+            "category_id": p.category_id,
+            "replace_options": [
+                {"id": o.id, "title": o.title, "category_id": o.category_id}
+                for o in p.replace_options.all()
+            ],
+        }
+        for p in my_products
+    ]
+
+    # Step 3: All candidates (no filter)
+    all_candidates = Product.objects.filter(status="approved").exclude(owner=request.user)
+    candidates_data = [
+        {"id": p.id, "title": p.title, "category_id": p.category_id, "owner_id": p.owner_id}
+        for p in all_candidates
+    ]
+
+    # Step 4: Build keyword_q and show what it matches
+    all_replace_options = []
+    for p in my_products:
+        for opt in p.replace_options.all():
+            all_replace_options.append(opt)
+
+    raw_keywords = []
+    for opt in all_replace_options:
+        raw_title = (opt.title or "").strip()
+        raw_keywords.append(f"full: {raw_title}")
+        for kw in raw_title.split():
+            if len(kw) > 2:
+                raw_keywords.append(f"word: {kw}")
+
+    # Step 5: Manual match check
+    keyword_q = Q()
+    for opt in all_replace_options:
+        raw_title = (opt.title or "").strip()
+        keyword_q |= Q(title__icontains=raw_title)
+        words = raw_title.split()
+        for kw in words:
+            if len(kw) > 2:
+                keyword_q |= Q(title__icontains=kw)
+        for i in range(len(words) - 1):
+            compound = words[i] + words[i+1]
+            keyword_q |= Q(title__icontains=compound)
+
+    matched_candidates = Product.objects.filter(keyword_q, status="approved").exclude(owner=request.user)
+    matched_data = [
+        {"id": p.id, "title": p.title, "owner_id": p.owner_id}
+        for p in matched_candidates
+    ]
+
+    # Step 6: Profile map check
+    owner_ids = [c["owner_id"] for c in matched_data]
+    profiles = UserProfile.objects.filter(user_id__in=owner_ids)
+    profile_map_data = [
+        {
+            "user_id": p.user_id,
+            "lat": str(p.latitude),
+            "lng": str(p.longitude),
+            "has_location": p.latitude is not None and p.longitude is not None,
+        }
+        for p in profiles
+    ]
+
+    # Step 7: Distance check
+    distance_data = []
+    owner_lat = float(owner_profile.latitude)
+    owner_lng = float(owner_profile.longitude)
+    for p in profiles:
+        if p.latitude and p.longitude:
+            dist = haversine(owner_lat, owner_lng, float(p.latitude), float(p.longitude))
+            distance_data.append({"user_id": p.user_id, "dist_km": round(dist, 2)})
+
+    return Response({
+        "my_profile":        profile_data,
+        "my_products":       my_products_data,
+        "all_candidates":    candidates_data,
+        "raw_keywords":      raw_keywords,
+        "matched_candidates": matched_data,
+        "profile_map":       profile_map_data,
+        "distances":         distance_data,
+    })
