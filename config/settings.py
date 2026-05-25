@@ -144,6 +144,8 @@ REST_FRAMEWORK = {
 }
 
 CORS_ALLOW_CREDENTIALS = True
+CSRF_COOKIE_HTTPONLY = False  # add this
+CSRF_USE_SESSIONS = False 
 
 
 # --------------------
