@@ -332,3 +332,36 @@ def send_test_notification(request):
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def profile_completion(request):
+    print("-------------------")
+    try:
+        profile = request.user.userprofile
+    except UserProfile.DoesNotExist:
+        return Response({"error": "Profile not found"}, status=404)
+
+    fields = {
+        "latitude":       profile.latitude,
+        "longitude":      profile.longitude,
+        "address":        profile.address,
+        "contact_number": profile.contact_number,
+        "description":    profile.description,
+        "city":           profile.city,
+        "pincode":        profile.pincode
+    }
+
+    completed   = {k: v for k, v in fields.items() if v not in [None, ""]}
+    incomplete  = {k: v for k, v in fields.items() if v     in [None, ""]}
+
+    percentage = (len(completed) / len(fields)) * 100
+
+    return Response({
+        "completion_percentage": round(percentage, 2),
+        "completed_fields":      list(completed.keys()),
+        "incomplete_fields":     list(incomplete.keys()),
+        "total_fields":          len(fields),
+        "filled_fields":         len(completed),
+    })

@@ -18,6 +18,8 @@ class UserProfile(models.Model):
     rating = models.FloatField(blank=True,null=True)
     role = models.CharField(max_length=30,default="User", choices=ROLE_CHOICES)
     contact_number = models.CharField(max_length=10,null=True,blank=True)
+    city = models.CharField(max_length=50,blank=True,null=True)
+    pincode = models.CharField(max_length=50,blank=True,null=True)
 
     def __str__(self):
         return self.user.username

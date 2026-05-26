@@ -7,6 +7,7 @@ urlpatterns = [
     path("me/",me),
     path("logout/",logout),
     path("upsertProfile/",profile),
+    path('completion/', profile_completion, name='profile-completion'),
     path("update_profile/",update_profile),
     path('notifications/', notifications),
     path('notifications/<int:pk>/', notification_detail),
