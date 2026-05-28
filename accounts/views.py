@@ -338,24 +338,32 @@ def send_test_notification(request):
 @permission_classes([IsAuthenticated])
 def profile_completion(request):
     print("-------------------")
+    
+    all_field_keys = ["latitude", "longitude", "address", "contact_number", "description", "city", "pincode"]
+
     try:
         profile = request.user.userprofile
+        fields = {
+            "latitude":       profile.latitude,
+            "longitude":      profile.longitude,
+            "address":        profile.address,
+            "contact_number": profile.contact_number,
+            "description":    profile.description,
+            "city":           profile.city,
+            "pincode":        profile.pincode,
+        }
     except UserProfile.DoesNotExist:
-        return Response({"error": "Profile not found"}, status=404)
+        # Profile doesn't exist — treat all fields as incomplete
+        return Response({
+            "completion_percentage": 0,
+            "completed_fields":      [],
+            "incomplete_fields":     all_field_keys,
+            "total_fields":          len(all_field_keys),
+            "filled_fields":         0,
+        })
 
-    fields = {
-        "latitude":       profile.latitude,
-        "longitude":      profile.longitude,
-        "address":        profile.address,
-        "contact_number": profile.contact_number,
-        "description":    profile.description,
-        "city":           profile.city,
-        "pincode":        profile.pincode
-    }
-
-    completed   = {k: v for k, v in fields.items() if v not in [None, ""]}
-    incomplete  = {k: v for k, v in fields.items() if v     in [None, ""]}
-
+    completed  = {k: v for k, v in fields.items() if v not in [None, ""]}
+    incomplete = {k: v for k, v in fields.items() if v     in [None, ""]}
     percentage = (len(completed) / len(fields)) * 100
 
     return Response({
