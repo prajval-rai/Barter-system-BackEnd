@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "admin")
+username = os.environ.get("DJANGO_SUPERUSER_USERNAME", "prajval")
 email    = os.environ.get("DJANGO_SUPERUSER_EMAIL", "admin@admin.com")
 password = os.environ.get("DJANGO_SUPERUSER_PASSWORD", "admin123")
 
