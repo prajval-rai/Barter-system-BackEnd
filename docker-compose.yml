@@ -14,22 +14,29 @@ services:
 
   web:
     build: .
-    command: python manage.py runserver 0.0.0.0:8000
+    command: >
+      sh -c "python manage.py migrate &&
+             python create_superuser.py &&
+             python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
     ports:
       - "8000:8000"
     depends_on:
       - db
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     environment:
       - DB_NAME=django_db
       - DB_USER=django_user
       - DB_PASSWORD=django_pass
       - DB_HOST=db
       - DB_PORT=5432
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
+      - DJANGO_SUPERUSER_USERNAME=admin
+      - DJANGO_SUPERUSER_EMAIL=admin@admin.com
+      - DJANGO_SUPERUSER_PASSWORD=admin123
+      - REDIS_URL=redis://default:haTX44BXWkgdc7zhwG5tUdaN4l7CXjoa@redis-10563.crce292.ap-south-1-2.ec2.cloud.redislabs.com:10563
 
 volumes:
   postgres_data:
