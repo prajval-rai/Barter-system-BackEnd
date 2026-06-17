@@ -1,10 +1,13 @@
 # chat/consumers.py
 
+from __future__ import annotations  # ← FIX: makes `str | None` etc. safe on Python <3.10
+
 import json
 import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth import get_user_model
+from django.db.models import Count, Q
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -19,7 +22,6 @@ logger = logging.getLogger(__name__)
 def _get_unread_counts_per_chat(user_email: str) -> dict:
     from chat.models import ChatMessage
     from barter.models import BarterRequest
-    from django.db.models import Count, Q
 
     active_request_ids = BarterRequest.objects.filter(
         status="accepted"
@@ -40,6 +42,7 @@ def _get_unread_counts_per_chat(user_email: str) -> dict:
 
     return {str(row['barter_request_id']): row['count'] for row in counts}
 
+
 async def push_unread_count(channel_layer, user_email: str):
     counts = await _get_unread_counts_per_chat(user_email)  # dict {req_id: count}
     await channel_layer.group_send(
@@ -58,15 +61,14 @@ def _unread_group(email: str) -> str:
 @database_sync_to_async
 def _get_unread_count(user_email: str) -> int:
     from chat.models import ChatMessage
-    from barter.models import BarterRequest          # adjust import to your app
+    from barter.models import BarterRequest  # adjust import to your app
 
     # All accepted/active barter requests this user is part of
     active_requests = BarterRequest.objects.filter(
         status="accepted"
     ).filter(
         # user is either side of the trade
-        __import__('django.db.models', fromlist=['Q']).Q(from_user__email=user_email) |
-        __import__('django.db.models', fromlist=['Q']).Q(to_user__email=user_email)
+        Q(from_user__email=user_email) | Q(to_user__email=user_email)
     ).values_list("id", flat=True)
 
     return ChatMessage.objects.filter(
@@ -298,7 +300,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
     def get_other_participant_email(self) -> str | None:
         """Return the email of the OTHER user in this barter request."""
         try:
-            from barter.models import BarterRequest          # adjust import
+            from barter.models import BarterRequest  # adjust import
             req = BarterRequest.objects.select_related(
                 "from_user", "to_user"
             ).get(id=self.request_id)
@@ -336,11 +338,10 @@ class UnreadCountConsumer(AsyncWebsocketConsumer):
             "counts": counts,
         }))
 
-async def unread_count_update(self, event):
-    await self.send(text_data=json.dumps({
-        "type":   "unread_counts",
-        "counts": event["counts"],
-    }))
+    # ← FIX: these three were dedented to column 0 in the original file,
+    #   which silently ended the class body and turned them into dead,
+    #   never-called nested functions. They're now real methods again.
+
     async def disconnect(self, code):
         if hasattr(self, "user_group"):
             await self.channel_layer.group_discard(self.user_group, self.channel_name)
@@ -362,6 +363,6 @@ async def unread_count_update(self, event):
     # Called by channel layer when push_unread_count fires
     async def unread_count_update(self, event):
         await self.send(text_data=json.dumps({
-            "type":  "unread_count",
-            "count": event["count"],
+            "type":   "unread_counts",
+            "counts": event["counts"],
         }))
