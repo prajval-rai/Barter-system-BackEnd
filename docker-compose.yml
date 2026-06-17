@@ -1,14 +1,12 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:15
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_DB=django_db
-      - POSTGRES_USER=django_user
-      - POSTGRES_PASSWORD=django_pass
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
     ports:
       - "5432:5432"
 
@@ -28,15 +26,15 @@ services:
       - 8.8.8.8
       - 8.8.4.4
     environment:
-      - DB_NAME=django_db
-      - DB_USER=django_user
-      - DB_PASSWORD=django_pass
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
       - DB_HOST=db
       - DB_PORT=5432
-      - DJANGO_SUPERUSER_USERNAME=admin
-      - DJANGO_SUPERUSER_EMAIL=admin@admin.com
-      - DJANGO_SUPERUSER_PASSWORD=admin123
-      - REDIS_URL=redis://default:haTX44BXWkgdc7zhwG5tUdaN4l7CXjoa@redis-10563.crce292.ap-south-1-2.ec2.cloud.redislabs.com:10563
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
+      - REDIS_URL=${REDIS_URL}
 
 volumes:
   postgres_data:
