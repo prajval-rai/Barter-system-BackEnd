@@ -92,6 +92,7 @@ INSTALLED_APPS = [
 ]
 
 
+
 ASGI_APPLICATION = 'config.asgi.application'
 
 
@@ -99,7 +100,6 @@ REDIS_URL = os.getenv(
     "REDIS_URL","redis-15305.crce285.us-east-1-4.ec2.cloud.redislabs.com:15305"
 )
 
-print("4444444444444444444444444444444",REDIS_URL)
 
 CHANNEL_LAYERS = {
     "default": {

@@ -12,7 +12,7 @@ class UserProfile(models.Model):
     )
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     latitude = models.FloatField(null=True,blank=True)
-    longitude = models.FloatField(null=True)
+    longitude = models.FloatField(null=True,blank=True)
     address = models.TextField(blank=True,null=True)
     description = models.TextField(blank=True,null=True)
     rating = models.FloatField(blank=True,null=True)
