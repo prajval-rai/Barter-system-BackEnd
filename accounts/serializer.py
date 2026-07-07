@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import UserProfile,UserNotification
+from .models import CustomUser,UserNotification
 
 
 # -----------------------
@@ -7,14 +7,14 @@ from .models import UserProfile,UserNotification
 # -----------------------
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
-        model = UserProfile
+        model = CustomUser
         fields = ['id', 'name']
 
 
 
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
-        model = UserProfile
+        model = CustomUser
         fields = "__all__"
 
 

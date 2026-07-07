@@ -109,6 +109,8 @@ CHANNEL_LAYERS = {
         },
     },
 }
+FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY")
+AUTH_USER_MODEL = "accounts.CustomUser"
 
 # ---------------JWT Config---------------
 SIMPLE_JWT = {
@@ -118,6 +120,8 @@ SIMPLE_JWT = {
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+HASH_SALT = os.getenv('HASH_SALT')
 
 
 CSRF_TRUSTED_ORIGINS = list(filter(None, [

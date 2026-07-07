@@ -2,26 +2,26 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from helper_function.config import Config
 from django.utils import timezone
-from .models import UserProfile,UserNotification,FCMToken
-from .serializer import ProfileSerializer,UserNotificationSerializer
+from .models import CustomUser, UserNotification, FCMToken
+from .serializer import ProfileSerializer, UserNotificationSerializer
 from utils.twilio_service import send_whatsapp_message
 from helper_function.utils import send_notification_to_token
 
 
-
 GOOGLE_CLIENT_ID = Config.google_key
+
+User = get_user_model()  # resolves to CustomUser — use this everywhere instead of importing User directly
 
 
 # ✅ Generate JWT tokens
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
-
     return {
         "refresh": str(refresh),
         "access": str(refresh.access_token),
@@ -68,7 +68,7 @@ def google_login(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # ✅ Get or create user
+        # ✅ Get or create user (CustomUser IS the user model — no separate profile object)
         user, created = User.objects.get_or_create(
             username=email,
             defaults={
@@ -77,9 +77,6 @@ def google_login(request):
                 "last_name": last_name,
             }
         )
-
-        # ✅ Ensure UserProfile exists
-        profile, _ = UserProfile.objects.get_or_create(user=user)
 
         # ✅ Update last login
         user.last_login = timezone.now()
@@ -95,10 +92,10 @@ def google_login(request):
                 "firstName": user.first_name,
                 "lastName": user.last_name,
                 "email": user.email,
-                "role": profile.role,
-                "address":profile.address,
-                "lat":profile.latitude,
-                "long":profile.longitude
+                "role": getattr(user, "role", None),
+                "address": getattr(user, "address", None),
+                "lat": getattr(user, "latitude", None),
+                "long": getattr(user, "longitude", None),
             }
         })
 
@@ -112,11 +109,8 @@ def google_login(request):
             max_age=86400,
         )
 
-        phone = profile.contact_number
-        first_name = user.first_name
-
-
-        send_whatsapp_message(phone,f"Wellcome {first_name}")
+        phone = user.contact_number
+        send_whatsapp_message(phone, f"Welcome {user.first_name}")
 
         response.set_cookie(
             key="refresh",
@@ -125,7 +119,6 @@ def google_login(request):
             secure=True,  # change to True in production
             samesite="None",
             max_age=604800,
-
         )
 
         return response
@@ -160,34 +153,36 @@ def me(request):
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout(request):
-
     response = Response({"message": "Logged out successfully"})
-
-    # Delete cookies
     response.delete_cookie("access")
     response.delete_cookie("refresh")
-
     return response
 
 
+# ======================================================
+# 🔥 PROFILE (GET) — CustomUser IS request.user, no separate lookup needed
+# ======================================================
+
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 def profile(request):
     try:
-        profile_object = UserProfile.objects.get(user=request.user.id)
-        profile_serialize = ProfileSerializer(profile_object).data
-        return Response({"data":profile_serialize})
+        profile_serialize = ProfileSerializer(request.user).data
+        return Response({"data": profile_serialize})
     except Exception as e:
-        return Response({"error":str(e)},status=status.HTTP_400_BAD_REQUEST)
-    
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ======================================================
+# 🔥 UPDATE PROFILE
+# ======================================================
 
 @api_view(["PUT"])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     try:
-        profile_object = UserProfile.objects.get(user=request.user)
-
         serializer = ProfileSerializer(
-            profile_object,
+            request.user,
             data=request.data,
             partial=True
         )
@@ -210,18 +205,16 @@ def update_profile(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    except UserProfile.DoesNotExist:
-        return Response(
-            {"message": "Profile not found"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
     except Exception as e:
         return Response(
             {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
-    
+
+
+# ======================================================
+# 🔥 NOTIFICATIONS
+# ======================================================
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
@@ -237,7 +230,6 @@ def notifications(request):
             serializer.save(user=request.user)
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
-    
 
 
 @api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
@@ -261,7 +253,6 @@ def notification_detail(request, pk):
     elif request.method == 'DELETE':
         obj.delete()
         return Response({"message": "Deleted"}, status=204)
-    
 
 
 @api_view(['PATCH'])
@@ -275,7 +266,6 @@ def mark_notification_read(request, pk):
     obj.staus = True
     obj.save()
     return Response({"message": "Marked as read"})
-
 
 
 @api_view(['PATCH'])
@@ -292,7 +282,9 @@ def unread_count(request):
     return Response({"unread_count": count})
 
 
-
+# ======================================================
+# 🔥 FCM TOKEN
+# ======================================================
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -311,7 +303,6 @@ def register_fcm_token(request):
     return Response({"message": "Token registered successfully"})
 
 
-
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def send_test_notification(request):
@@ -322,7 +313,7 @@ def send_test_notification(request):
         return Response({"error": "Token is required"}, status=400)
 
     try:
-        response = send_notification_to_token(
+        send_notification_to_token(
             token=token,
             title="🎉 The legend has arrived!",
             body=f"Welcome back, {username}! The app was getting lonely without you. 👀",
@@ -334,36 +325,29 @@ def send_test_notification(request):
         return Response({"error": str(e)}, status=500)
 
 
+# ======================================================
+# 🔥 PROFILE COMPLETION — CustomUser IS request.user, no reverse lookup needed
+# ======================================================
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def profile_completion(request):
-    print("-------------------")
-    
     all_field_keys = ["latitude", "longitude", "address", "contact_number", "description", "city", "pincode"]
 
-    try:
-        profile = request.user.userprofile
-        fields = {
-            "latitude":       profile.latitude,
-            "longitude":      profile.longitude,
-            "address":        profile.address,
-            "contact_number": profile.contact_number,
-            "description":    profile.description,
-            "city":           profile.city,
-            "pincode":        profile.pincode,
-        }
-    except UserProfile.DoesNotExist:
-        # Profile doesn't exist — treat all fields as incomplete
-        return Response({
-            "completion_percentage": 0,
-            "completed_fields":      [],
-            "incomplete_fields":     all_field_keys,
-            "total_fields":          len(all_field_keys),
-            "filled_fields":         0,
-        })
+    user = request.user
 
-    completed  = {k: v for k, v in fields.items() if v not in [None, ""]}
-    incomplete = {k: v for k, v in fields.items() if v     in [None, ""]}
+    fields = {
+        "latitude":       getattr(user, "latitude", None),
+        "longitude":      getattr(user, "longitude", None),
+        "address":        getattr(user, "address", None),
+        "contact_number": getattr(user, "contact_number", None),
+        "description":    getattr(user, "description", None),
+        "city":           getattr(user, "city", None),
+        "pincode":        getattr(user, "pincode", None),
+    }
+
+    completed = {k: v for k, v in fields.items() if v not in [None, ""]}
+    incomplete = {k: v for k, v in fields.items() if v in [None, ""]}
     percentage = (len(completed) / len(fields)) * 100
 
     return Response({

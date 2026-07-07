@@ -10,7 +10,9 @@ from django.db.models import Q,Subquery, OuterRef, IntegerField,Count
 from django.db.models.functions import Coalesce
 from utils.twilio_service import send_whatsapp_message
 from chat.models import ChatMessage
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -45,7 +47,7 @@ def create_barter_request(request):
             request_for_product=request_for_product
         )
 
-        receiver_phone = to_user.userprofile.contact_number
+        receiver_phone = to_user.CustomUser.contact_number
         if receiver_phone:
             receiver_phone = f"+91{receiver_phone}"
             receiver_msg = (

@@ -1,6 +1,7 @@
 from django.db import models
+from django.conf import settings
 from products.models import Product,Category
-from django.contrib.auth.models import User
+User = settings.AUTH_USER_MODEL
 
 class ReplaceOption(models.Model):
     

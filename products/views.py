@@ -3,7 +3,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
-from .models import Product, ProductImage, Category,BookMarkProduct
+from .models import Product, ProductImage, Category, BookMarkProduct
 from .serializers import *
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Prefetch
@@ -14,7 +14,7 @@ from barter.models import ReplaceOption
 from django.db import transaction
 import json
 from django.db.models import Q
-from accounts.models import UserProfile
+from accounts.models import CustomUser
 from barter.serializers import ProductBasicSerializer
 from utils.twilio_service import send_whatsapp_message
 # --------------------
@@ -57,9 +57,6 @@ def category_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
@@ -80,7 +77,9 @@ def create_product(request):
             ProductImage.objects.create(product=product, image=f)
 
         # Send WhatsApp notification
-        phone = request.user.userprofile.contact_number
+        # ✅ FIX: request.user IS the CustomUser (CustomUser extends AbstractUser
+        # and is AUTH_USER_MODEL) — there is no separate profile object to traverse.
+        phone = request.user.contact_number
         if phone:
             phone = f"+91{phone}"
             message = (
@@ -176,7 +175,7 @@ def add_replace_options(request, product_id):
                     category=v.get("category"),
                     point_value=v.get("point_value"),
                     meta=v.get("meta", {}),
-                    icon = v.get("icon","")
+                    icon=v.get("icon", "")
                 )
             )
 
@@ -411,7 +410,6 @@ def product_detail(request, pk):
 @permission_classes([IsAuthenticated])
 def product_image_delete(request, pk):
     try:
-        print("---------------------",pk)
         image = ProductImage.objects.get(pk=pk)
     except ProductImage.DoesNotExist:
         return Response({"error": "Image not found"}, status=status.HTTP_404_NOT_FOUND)
@@ -434,8 +432,6 @@ def products_grouped_by_category(request):
             .prefetch_related('images', 'replace_options')
         )
     )
-
-    print("---------------------",categories)
 
     data = []
     for category in categories:
@@ -522,7 +518,7 @@ def products_by_status(request):
 
     status_param = request.GET.get("status", "approved")
 
-    valid_status = ["submitted", "approved", "closed","banned","rejected"]
+    valid_status = ["submitted", "approved", "closed", "banned", "rejected"]
 
     if status_param not in valid_status:
         return Response(
@@ -530,7 +526,7 @@ def products_by_status(request):
             status=400
         )
 
-    products = Product.objects.filter(owner=request.user,status=status_param).order_by('-created_at')
+    products = Product.objects.filter(owner=request.user, status=status_param).order_by('-created_at')
     serializer = GetProductSerializer(products, many=True)
     return Response(serializer.data)
 
@@ -560,7 +556,7 @@ def admin_products_by_status(request):
 
     status_param = request.GET.get("status", "approved")
 
-    valid_status = ["submitted", "approved", "closed","banned","rejected"]
+    valid_status = ["submitted", "approved", "closed", "banned", "rejected"]
 
     if status_param not in valid_status:
         return Response(
@@ -572,23 +568,21 @@ def admin_products_by_status(request):
     serializer = GetProductSerializer(products, many=True)
     return Response(serializer.data)
 
-    
-
-
 
 @permission_classes([IsAuthenticated])
 @api_view(["POST"])
 def change_product_status(request):
     try:
         status_value = request.GET.get('status')
-        status_choice = ["submitted","approved","closed","rejected","banned"]
+        status_choice = ["submitted", "approved", "closed", "rejected", "banned"]
 
         if status_value not in status_choice:
-            return Response({"message":"Select Proper Status"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"message": "Select Proper Status"}, status=status.HTTP_400_BAD_REQUEST)
 
         product_id = request.GET.get('product_id')
 
-        user_profile = UserProfile.objects.get(user=request.user.id)
+        # ✅ FIX: request.user IS the CustomUser — no separate profile lookup needed
+        user_profile = request.user
 
         if user_profile.role == "Admin":
 
@@ -599,7 +593,8 @@ def change_product_status(request):
             # -------------------------
             # 🔔 WhatsApp Notification
             # -------------------------
-            owner_profile = UserProfile.objects.get(user=product_obj.owner)
+            # ✅ FIX: product_obj.owner IS the CustomUser already, no lookup needed
+            owner_profile = product_obj.owner
 
             phone = owner_profile.contact_number
 
@@ -730,7 +725,7 @@ def change_product_status(request):
 def marketplace(request):
     # ── 1. Parse params ──────────────────────────────────────────────────────
     try:
-        page      = max(1, int(request.query_params.get("page", 1)))
+        page = max(1, int(request.query_params.get("page", 1)))
     except (TypeError, ValueError):
         page = 1
 
@@ -739,15 +734,14 @@ def marketplace(request):
     except (TypeError, ValueError):
         page_size = 12
 
-    search   = request.query_params.get("search", "").strip()
+    search = request.query_params.get("search", "").strip()
     category = request.query_params.get("category", "").strip()
-    sort     = request.query_params.get("sort", "newest")
+    sort = request.query_params.get("sort", "newest")
 
     # ── 2. Base queryset — approved only, exclude own products ───────────────
     qs = (
         Product.objects
         .filter(status="approved")
-        .exclude(owner=request.user)
         .select_related("owner", "category")
         .prefetch_related("replace_options", "images")
     )
@@ -767,9 +761,9 @@ def marketplace(request):
     qs = qs.order_by("created_at" if sort == "oldest" else "-created_at")
 
     # ── 6. Paginate ───────────────────────────────────────────────────────────
-    total    = qs.count()
-    offset   = (page - 1) * page_size
-    products = qs[offset : offset + page_size]
+    total = qs.count()
+    offset = (page - 1) * page_size
+    products = qs[offset: offset + page_size]
     has_next = (offset + page_size) < total
 
     # ── 7. Serialize & return ─────────────────────────────────────────────────
@@ -778,11 +772,11 @@ def marketplace(request):
     )
 
     return Response({
-        "results":   serializer.data,
-        "page":      page,
+        "results": serializer.data,
+        "page": page,
         "page_size": page_size,
-        "total":     total,
-        "has_next":  has_next,
+        "total": total,
+        "has_next": has_next,
     }, status=status.HTTP_200_OK)
 
 
@@ -792,11 +786,11 @@ def marketplace(request):
 def my_product(request):
     try:
         product_obj = Product.objects.filter(owner=request.user.id).order_by('-id')
-        product_basic = ProductBasicSerializer(product_obj,many=True,context={"request": request}).data
+        product_basic = ProductBasicSerializer(product_obj, many=True, context={"request": request}).data
         return Response(product_basic)
 
     except Exception as e:
-        return Response({'message':str(e)})
+        return Response({'message': str(e)})
     
 
 
@@ -846,7 +840,6 @@ def get_bookmarks(request):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def remove_bookmark(request, product_id):
-    print("MMMMMMMMMMMMMMMMMMMMMMMMMM")
     bookmark = BookMarkProduct.objects.filter(
         product_id=product_id,
         user=request.user

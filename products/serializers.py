@@ -1,7 +1,9 @@
 from rest_framework import serializers
-from .models import Product, ProductImage, Category,BookMarkProduct
+from .models import Product, ProductImage, Category, BookMarkProduct
 from barter.models import ReplaceOption
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+
+User = get_user_model()  # resolves to accounts.CustomUser
 
 
 # -----------------------
@@ -25,7 +27,7 @@ class ReplaceOptionSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ReplaceOption
-        fields = ['id', 'title', 'description', 'category', 'category_id', 'replace_type', 'point_value', 'meta','icon']
+        fields = ['id', 'title', 'description', 'category', 'category_id', 'replace_type', 'point_value', 'meta', 'icon']
 
     def validate(self, attrs):
         replace_type = attrs.get('replace_type', getattr(self.instance, 'replace_type', None))
@@ -39,22 +41,20 @@ class ReplaceOptionSerializer(serializers.ModelSerializer):
 
 
 class ProductListSerializer(serializers.ModelSerializer):
-    replace_options = ReplaceOptionSerializer(many=True,write_only=True,required=False)
+    replace_options = ReplaceOptionSerializer(many=True, write_only=True, required=False)
     product_replace_options = serializers.SerializerMethodField()
+
     class Meta:
         model = Product
         fields = [
             'id', 'title', 'description',
             'created_at',
-             'replace_options', 'product_replace_options','purchase_year','purchase_bill'
+            'replace_options', 'product_replace_options', 'purchase_year', 'purchase_bill'
         ]
-        read_only_fields = ['status', 'created_at', 'product_replace_options',"title"]
+        read_only_fields = ['status', 'created_at', 'product_replace_options', "title"]
 
     def get_product_replace_options(self, obj):
         return ReplaceOptionSerializer(obj.replace_options.all(), many=True).data
-
-
-
 
 
 # -----------------------
@@ -69,54 +69,54 @@ class ProductImageSerializer(serializers.ModelSerializer):
         model = ProductImage
         fields = ['id', 'image', 'created_at', 'product']
         read_only_fields = ['created_at', 'product']
-        
+
+
 class OwnerSerializer(serializers.ModelSerializer):
-    address        = serializers.SerializerMethodField()
-    rating         = serializers.SerializerMethodField()
-    description    = serializers.SerializerMethodField()
+    # ✅ FIX: `obj` here IS the CustomUser instance (User = get_user_model()
+    # resolves to CustomUser) — there is no nested `.CustomUser` profile to
+    # traverse. Read the fields straight off `obj`.
+    address = serializers.SerializerMethodField()
+    rating = serializers.SerializerMethodField()
+    description = serializers.SerializerMethodField()
+    contact_number = serializers.SerializerMethodField()
 
     class Meta:
-        model  = User
-        fields = ["id"
-                  , "address", "rating", "description"]
+        model = User  # resolves to CustomUser
+        fields = ["id", "contact_number", "address", "rating", "description"]
 
     def get_contact_number(self, obj):
-        try: return obj.userprofile.contact_number
-        except: return None
+        return getattr(obj, "contact_number", None)
 
     def get_address(self, obj):
-        try: return obj.userprofile.address
-        except: return None
+        return getattr(obj, "address", None)
 
     def get_rating(self, obj):
-        try: return obj.userprofile.rating
-        except: return None
+        return getattr(obj, "rating", None)
 
     def get_description(self, obj):
-        try: return obj.userprofile.description
-        except: return None
+        return getattr(obj, "description", None)
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    replace_options         = ReplaceOptionSerializer(many=True, write_only=True, required=False)
+    replace_options = ReplaceOptionSerializer(many=True, write_only=True, required=False)
     product_replace_options = serializers.SerializerMethodField()
-    images                  = ProductImageSerializer(many=True, read_only=True)
-    category_id             = serializers.PrimaryKeyRelatedField(
-                                queryset=Category.objects.all(),
-                                source='category',
-                                write_only=True
-                              )
-    category                = CategorySerializer(read_only=True)
-    owner                   = OwnerSerializer(read_only=True)   # ← added
-    is_bookmarked           = serializers.SerializerMethodField()
+    images = ProductImageSerializer(many=True, read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=Category.objects.all(),
+        source='category',
+        write_only=True
+    )
+    category = CategorySerializer(read_only=True)
+    owner = OwnerSerializer(read_only=True)  # ← added
+    is_bookmarked = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = [
             'id', 'title', 'description', 'category', 'category_id', 'images',
             'status', 'created_at', 'replace_options', 'product_replace_options',
             'purchase_year', 'purchase_bill',
-            'owner','is_bookmarked'                                               # ← added
+            'owner', 'is_bookmarked'  # ← added
         ]
         read_only_fields = ['status', 'created_at']
 
@@ -131,23 +131,16 @@ class ProductSerializer(serializers.ModelSerializer):
         }
         product_kwargs.update(validated_data)
         return Product.objects.create(**product_kwargs)
-    
 
     def get_is_bookmarked(self, obj):
         request = self.context.get('request')
-        print("REQUEST:", request)               # should NOT be None
-        print("USER:", request.user)             # should be your email
-        print("IS AUTH:", request.user.is_authenticated)  # should be True
-        
+
         if request and request.user.is_authenticated:
-            exists = BookMarkProduct.objects.filter(
+            return BookMarkProduct.objects.filter(
                 product=obj,
                 user=request.user
             ).exists()
-            print("EXISTS:", exists)             # check this
-            return exists
         return False
-    
 
     def update(self, instance, validated_data):
         category = validated_data.pop('category', None)
@@ -157,9 +150,6 @@ class ProductSerializer(serializers.ModelSerializer):
             instance.category = category
         instance.save()
         return instance
-
-
-
 
 
 class GetProductSerializer(serializers.ModelSerializer):
@@ -182,7 +172,7 @@ class GetProductSerializer(serializers.ModelSerializer):
             'description',
             'category',
             'category_id',
-            'thumbnail',   # 👈 single image only
+            'thumbnail',  # 👈 single image only
             'status',
             'created_at',
             'replace_options',
@@ -228,19 +218,18 @@ class GetProductSerializer(serializers.ModelSerializer):
         return instance
 
 
-
 class MarketReplaceOptionSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", default=None)
 
     class Meta:
-        model  = ReplaceOption
-        fields = ["id", "replace_type", "title", "description", "category_name","icon"]
+        model = ReplaceOption
+        fields = ["id", "replace_type", "title", "description", "category_name", "icon"]
 
 
 class MarketplaceProductSerializer(serializers.ModelSerializer):
-    category_name   = serializers.CharField(source="category.name", default=None)
-    owner_name      = serializers.SerializerMethodField()
-    thumbnail       = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source="category.name", default=None)
+    owner_name = serializers.SerializerMethodField()
+    thumbnail = serializers.SerializerMethodField()
     replace_options = MarketReplaceOptionSerializer(many=True, read_only=True)
 
     owner_latitude = serializers.SerializerMethodField()
@@ -248,12 +237,12 @@ class MarketplaceProductSerializer(serializers.ModelSerializer):
     owner_address = serializers.SerializerMethodField()
 
     class Meta:
-        model  = Product
+        model = Product
         fields = [
             "id",
             "title",
             "description",
-            "category",          # id
+            "category",  # id
             "category_name",
             "status",
             "created_at",
@@ -270,24 +259,18 @@ class MarketplaceProductSerializer(serializers.ModelSerializer):
         u = obj.owner
         full = f"{u.first_name} {u.last_name}".strip()
         return full or u.username
-    
 
-    def _get_profile(self,obj):
-        return getattr(obj.owner,"userprofile",None)
+    # ✅ FIX: obj.owner IS the CustomUser instance already — there's no nested
+    # `.CustomUser` profile object to fetch via getattr. The old code always
+    # returned None here, which is why owner_latitude/longitude/address were null.
+    def get_owner_latitude(self, obj):
+        return getattr(obj.owner, "latitude", None)
 
+    def get_owner_longitude(self, obj):
+        return getattr(obj.owner, "longitude", None)
 
-    def get_owner_latitude(self,obj):
-        profile = self._get_profile(obj)
-        return profile.latitude if profile else None
-    
-    def get_owner_longitude(self,obj):
-        profile = self._get_profile(obj)
-        return profile.longitude if profile else None
-    
-    def get_owner_address(self,obj):
-        profile = self._get_profile(obj)
-        return profile.address if profile else None
-    
+    def get_owner_address(self, obj):
+        return getattr(obj.owner, "address", None)
 
     def get_thumbnail(self, obj):
         request = self.context.get("request")
@@ -301,7 +284,6 @@ class MarketplaceProductSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(url) if request else url
         except Exception:
             return None
-        
 
 
 class BookmarkSerializer(serializers.ModelSerializer):

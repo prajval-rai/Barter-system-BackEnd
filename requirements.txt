@@ -68,3 +68,6 @@ zope.interface==8.2
 twilio
 whitenoise[brotli]
 firebase-admin
+python-dotenv
+cryptography
+django-encrypted-model-fields

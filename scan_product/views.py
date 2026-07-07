@@ -7,9 +7,9 @@ from django.db.models import Q
 from math import radians, sin, cos, sqrt, atan2
 from products.models import Product
 from barter.models import ReplaceOption
-from accounts.models import UserProfile  # adjust to your app name
+from django.contrib.auth import get_user_model
 
-
+User = get_user_model()
 # ── Haversine distance (km) ──────────────────────────────────────────────────
 def haversine(lat1, lon1, lat2, lon2):
     R = 6371
@@ -279,8 +279,8 @@ def scan_product(request, product_id):
 
     # ── 2. Owner location ────────────────────────────────────────────────────
     try:
-        owner_profile = UserProfile.objects.get(user=request.user)
-    except UserProfile.DoesNotExist:
+        owner_profile = User.objects.get(user=request.user)
+    except User.DoesNotExist:
         return Response(
             {"error": "Profile not found. Please complete your profile."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -347,9 +347,9 @@ def scan_product(request, product_id):
     # ── 6. Distance + scoring ─────────────────────────────────────────────────
     owner_ids   = candidates.values_list("owner_id", flat=True).distinct()
     profile_map = {
-        p.user_id: p
-        for p in UserProfile.objects.filter(
-            user_id__in=owner_ids,
+        p.id: p
+        for p in User.objects.filter(
+            id__in=owner_ids,
             latitude__isnull=False,
             longitude__isnull=False,
         )
@@ -404,8 +404,8 @@ def nearby_products(request):
 
     # ── 1. Get requester's location ──────────────────────────────────────────
     try:
-        profile = UserProfile.objects.get(user=request.user)
-    except UserProfile.DoesNotExist:
+        profile = User.objects.get(id=request.user.id)
+    except User.DoesNotExist:
         return Response(
             {"error": "Profile not found. Please complete your profile."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -453,9 +453,9 @@ def nearby_products(request):
     # ── 4. Build owner → profile map ─────────────────────────────────────────
     owner_ids   = candidates.values_list("owner_id", flat=True).distinct()
     profile_map = {
-        p.user_id: p
-        for p in UserProfile.objects.filter(
-            user_id__in=owner_ids,
+        p.id: p
+        for p in User.objects.filter(
+            id__in=owner_ids,
             latitude__isnull=False,
             longitude__isnull=False,
         )
@@ -519,8 +519,8 @@ def scan_all_my_products(request):
 
     # ── 1. Owner location ────────────────────────────────────────────────────
     try:
-        owner_profile = UserProfile.objects.get(user=request.user)
-    except UserProfile.DoesNotExist:
+        owner_profile = User.objects.get(id=request.user.id)
+    except User.DoesNotExist:
         return Response(
             {"error": "Profile not found. Please complete your profile."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -623,9 +623,9 @@ def scan_all_my_products(request):
     # ── 6. Build owner → profile map ─────────────────────────────────────────
     owner_ids   = candidates.values_list("owner_id", flat=True).distinct()
     profile_map = {
-        p.user_id: p
-        for p in UserProfile.objects.filter(
-            user_id__in=owner_ids,
+        p.id: p
+        for p in User.objects.filter(
+            id__in=owner_ids,
             latitude__isnull=False,
             longitude__isnull=False,
         )
@@ -713,12 +713,12 @@ def debug_scan(request):
     
     # Step 1: Check profile
     try:
-        owner_profile = UserProfile.objects.get(user=request.user)
+        owner_profile = User.objects.get(user=request.user)
         profile_data = {
             "lat": str(owner_profile.latitude),
             "lng": str(owner_profile.longitude),
         }
-    except UserProfile.DoesNotExist:
+    except User.DoesNotExist:
         return Response({"error": "No profile"})
 
     # Step 2: My products
@@ -778,10 +778,10 @@ def debug_scan(request):
 
     # Step 6: Profile map check
     owner_ids = [c["owner_id"] for c in matched_data]
-    profiles = UserProfile.objects.filter(user_id__in=owner_ids)
+    profiles = User.objects.filter(id__in=owner_ids)
     profile_map_data = [
         {
-            "user_id": p.user_id,
+            "user_id": p.id,
             "lat": str(p.latitude),
             "lng": str(p.longitude),
             "has_location": p.latitude is not None and p.longitude is not None,
@@ -796,7 +796,7 @@ def debug_scan(request):
     for p in profiles:
         if p.latitude and p.longitude:
             dist = haversine(owner_lat, owner_lng, float(p.latitude), float(p.longitude))
-            distance_data.append({"user_id": p.user_id, "dist_km": round(dist, 2)})
+            distance_data.append({"user_id": p.id, "dist_km": round(dist, 2)})
 
     return Response({
         "my_profile":        profile_data,
