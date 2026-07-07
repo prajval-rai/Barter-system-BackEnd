@@ -17,6 +17,7 @@ from django.db.models import Q
 from accounts.models import CustomUser
 from barter.serializers import ProductBasicSerializer
 from utils.twilio_service import send_whatsapp_message
+from helper_function.utils import send_html_email,build_admin_review_email
 # --------------------
 # CATEGORY CRUD
 # --------------------
@@ -57,6 +58,7 @@ def category_detail(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
@@ -70,13 +72,13 @@ def create_product(request):
         )
         product_serializer.is_valid(raise_exception=True)
         product = product_serializer.save(owner=request.user)
-
+ 
         # Add Images
         images = request.FILES.getlist('images')
         for f in images:
             ProductImage.objects.create(product=product, image=f)
-
-        # Send WhatsApp notification
+ 
+        # Send WhatsApp notification to the owner
         # ✅ FIX: request.user IS the CustomUser (CustomUser extends AbstractUser
         # and is AUTH_USER_MODEL) — there is no separate profile object to traverse.
         phone = request.user.contact_number
@@ -100,7 +102,17 @@ def create_product(request):
                 f"_– BarterApp Team_ 🛍️"
             )
             send_whatsapp_message(phone, message)
-
+ 
+        # Notify admin for review via HTML email
+        review_url = f"{settings.FRONTEND_BASE_URL}/admin/products/{product.id}/review"
+        plain_message, html_message = build_admin_review_email(product, review_url)
+        send_html_email(
+            subject=f"🆕 New Product Pending Review: {product.title}",
+            plain_message=plain_message,
+            html_message=html_message,
+            recipient_list=settings.DEFAULT_ADMIN.split(','),
+        )
+ 
         return Response(
             {
                 "success": True,
@@ -109,10 +121,9 @@ def create_product(request):
             },
             status=status.HTTP_201_CREATED
         )
-
+ 
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 
 
 @api_view(['POST'])
