@@ -112,6 +112,7 @@ CHANNEL_LAYERS = {
 FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY")
 AUTH_USER_MODEL = "accounts.CustomUser"
 
+
 # ---------------JWT Config---------------
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
