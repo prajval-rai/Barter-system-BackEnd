@@ -28,17 +28,17 @@ if not firebase_admin._apps and firebase_json:
 # --------------------
 # SECURITY
 # --------------------
-CLOUD_FILE_NAME = os.getenv("CLOUD_FILE_NAME") 
+CLOUD_FILE_NAME = os.getenv("cloud_file_name") 
 GOOGLE_SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
 ALLOWED_HOSTS = ["*"]
 
 # --------------------
 # GOOGLE CLOUD STORAGE
 # --------------------
-GS_BUCKET_NAME = os.getenv("BUCKET_NAME")
-GS_PROJECT_ID = os.getenv("PROJECT_ID")
+GS_BUCKET_NAME = os.getenv("NEW_BUCKET_NAME")
+GS_PROJECT_ID = os.getenv("NEW_PROJECT_ID")
 
-CLOUD_FILE_NAME = os.getenv("cloud_file_name")
+CLOUD_FILE_NAME = os.getenv("NEW_CLOUD_FILE_NAME")
 GS_CREDENTIALS = None
 
 if GOOGLE_SERVICE_ACCOUNT_JSON:
@@ -55,8 +55,8 @@ STORAGES = {
     "default": {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         "OPTIONS": {
-            "BUCKET_NAME": GS_BUCKET_NAME,
-            "PROJECT_ID": GS_PROJECT_ID,
+            "bucket_name": GS_BUCKET_NAME,
+            "project_id": GS_PROJECT_ID,
             "credentials": GS_CREDENTIALS,
             "location": "uploads",
         },
@@ -64,32 +64,6 @@ STORAGES = {
     "staticfiles": {
         # ✅ Whitenoise serves static files (admin CSS, JS) in production
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
-    },
-}
-
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "INFO",
-    },
-    "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "django.request": {
-            "handlers": ["console"],
-            "level": "ERROR",
-            "propagate": False,
-        },
     },
 }
 
@@ -252,6 +226,32 @@ DATABASES = {
         conn_max_age=600,
         ssl_require=True
     )
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
 }
 
 # --------------------
