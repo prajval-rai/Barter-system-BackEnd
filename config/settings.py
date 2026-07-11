@@ -59,14 +59,17 @@ STORAGES = {
             "project_id": GS_PROJECT_ID,
             "credentials": GS_CREDENTIALS,
             "location": "uploads",
+            "querystring_auth": False,        # <-- stop generating signed URLs
+            "default_acl": "publicRead",      # <-- new uploads are public
+            "object_parameters": {
+                "cache_control": "public, max-age=31536000, immutable",
+            },
         },
     },
     "staticfiles": {
-        # ✅ Whitenoise serves static files (admin CSS, JS) in production
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
-
 # --------------------
 # APPS
 # --------------------
