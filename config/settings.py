@@ -35,8 +35,8 @@ ALLOWED_HOSTS = ["*"]
 # --------------------
 # GOOGLE CLOUD STORAGE
 # --------------------
-GS_BUCKET_NAME = os.getenv("bucket_name")
-GS_PROJECT_ID = os.getenv("project_id")
+GS_BUCKET_NAME = os.getenv("BUCKET_NAME")
+GS_PROJECT_ID = os.getenv("PROJECT_ID")
 
 CLOUD_FILE_NAME = os.getenv("cloud_file_name")
 GS_CREDENTIALS = None
@@ -55,8 +55,8 @@ STORAGES = {
     "default": {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         "OPTIONS": {
-            "bucket_name": GS_BUCKET_NAME,
-            "project_id": GS_PROJECT_ID,
+            "BUCKET_NAME": GS_BUCKET_NAME,
+            "PROJECT_ID": GS_PROJECT_ID,
             "credentials": GS_CREDENTIALS,
             "location": "uploads",
         },
