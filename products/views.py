@@ -62,48 +62,33 @@ def category_detail(request, pk):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 @parser_classes([MultiPartParser, FormParser])
-@transaction.atomic
 def create_product(request):
     try:
-        # Create Product
-        product_serializer = ProductSerializer(
-            data=request.data,
-            context={'request': request}
-        )
-        product_serializer.is_valid(raise_exception=True)
-        product = product_serializer.save(owner=request.user)
- 
-        # Add Images
-        images = request.FILES.getlist('images')
-        for f in images:
-            ProductImage.objects.create(product=product, image=f)
- 
-        # Send WhatsApp notification to the owner
-        # ✅ FIX: request.user IS the CustomUser (CustomUser extends AbstractUser
-        # and is AUTH_USER_MODEL) — there is no separate profile object to traverse.
-        phone = request.user.contact_number
-        if phone:
-            phone = f"+91{phone}"
-            message = (
-                f"🎉 *Product Listed Successfully!*\n\n"
-                f"Hey *{request.user.username}* 👋\n\n"
-                f"Your product is now *live* and under review by our team.\n\n"
-                f"━━━━━━━━━━━━━━━━\n"
-                f"📦 *Product:* {product.title}\n"
-                f"📌 *Status:* Under Review 🔍\n"
-                f"━━━━━━━━━━━━━━━━\n\n"
-                f"⏳ *What happens next?*\n"
-                f"  • Our team will review your listing\n"
-                f"  • Once approved, it becomes visible to all users\n"
-                f"  • You'll get notified the moment someone matches your exchange!\n\n"
-                f"💡 *Pro Tip:* Make sure your product images are clear and "
-                f"your exchange options are accurate for faster approval.\n\n"
-                f"🤝 Happy Trading & Best of Luck!\n\n"
-                f"_– BarterApp Team_ 🛍️"
+        with transaction.atomic():
+            product_serializer = ProductSerializer(
+                data=request.data,
+                context={'request': request}
             )
-            send_whatsapp_message(phone, message)
- 
-        # Notify admin for review via HTML email
+            product_serializer.is_valid(raise_exception=True)
+            product = product_serializer.save(owner=request.user)
+
+            images = request.FILES.getlist('images')
+            for f in images:
+                ProductImage.objects.create(product=product, image=f)
+
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Notifications happen OUTSIDE the atomic block —
+    # failures here can't roll back the product that's already committed
+    phone = request.user.contact_number
+    if phone:
+        try:
+            send_whatsapp_message(f"+91{phone}", message)
+        except Exception:
+            pass  # log if you want, but never fail the request over this
+
+    try:
         review_url = f"{settings.FRONTEND_BASE_URL}/admin/products/{product.id}/review"
         plain_message, html_message = build_admin_review_email(product, review_url)
         send_html_email(
@@ -112,19 +97,17 @@ def create_product(request):
             html_message=html_message,
             recipient_list=settings.DEFAULT_ADMIN.split(','),
         )
- 
-        return Response(
-            {
-                "success": True,
-                "product_id": product.id,
-                "message": "Product created successfully. Now add your replace options."
-            },
-            status=status.HTTP_201_CREATED
-        )
- 
-    except Exception as e:
-        return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    except Exception:
+        pass  # notification failure should never affect the API response
 
+    return Response(
+        {
+            "success": True,
+            "product_id": product.id,
+            "message": "Product created successfully. Now add your replace options."
+        },
+        status=status.HTTP_201_CREATED
+    )
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
