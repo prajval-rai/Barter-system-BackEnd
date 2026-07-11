@@ -109,8 +109,14 @@ def google_login(request):
             max_age=86400,
         )
 
+        # ✅ Send WhatsApp welcome message only if contact number exists
         phone = user.contact_number
-        send_whatsapp_message(phone, f"Welcome {user.first_name}")
+
+        if phone:
+            try:
+                send_whatsapp_message(phone, f"Welcome {user.first_name}")
+            except Exception:
+                pass  # don't let a WhatsApp/Twilio failure break login
 
         response.set_cookie(
             key="refresh",
@@ -128,8 +134,6 @@ def google_login(request):
             {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
-
-
 # ======================================================
 # 🔥 GET CURRENT USER
 # ======================================================
