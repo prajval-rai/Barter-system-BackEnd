@@ -1,5 +1,5 @@
 from rest_framework.decorators import api_view, permission_classes, parser_classes
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny,IsAdminUser
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework import status
@@ -563,7 +563,7 @@ def admin_products_by_status(request):
     return Response(serializer.data)
 
 
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated,IsAdminUser])
 @api_view(["POST"])
 def change_product_status(request):
     try:
@@ -578,114 +578,114 @@ def change_product_status(request):
         # ✅ FIX: request.user IS the CustomUser — no separate profile lookup needed
         user_profile = request.user
 
-        if user_profile.role == "Admin":
+        # if user_profile.role == "Admin":
 
-            product_obj = Product.objects.get(id=product_id)
-            product_obj.status = status_value
-            product_obj.save()
+        product_obj = Product.objects.get(id=product_id)
+        product_obj.status = status_value
+        product_obj.save()
 
-            # -------------------------
-            # 🔔 WhatsApp Notification
-            # -------------------------
-            # ✅ FIX: product_obj.owner IS the CustomUser already, no lookup needed
-            owner_profile = product_obj.owner
+        # -------------------------
+        # 🔔 WhatsApp Notification
+        # -------------------------
+        # ✅ FIX: product_obj.owner IS the CustomUser already, no lookup needed
+        owner_profile = product_obj.owner
 
-            phone = owner_profile.contact_number
+        phone = owner_profile.contact_number
 
-            if phone:
-                phone = f"+91{phone}"
+        if phone:
+            phone = f"+91{phone}"
 
-                # Friendly message based on status
-                if status_value == "approved":
-                    msg = (
-                        f"✅ *Product Approved!*\n\n"
-                        f"Hey *{product_obj.owner.username}* 👋\n\n"
-                        f"🎉 Great news! Your product has been *approved* and is now *live* on the platform!\n\n"
-                        f"━━━━━━━━━━━━━━━━\n"
-                        f"📦 *Product:* {product_obj.title}\n"
-                        f"📌 *Status:* Approved ✅\n"
-                        f"━━━━━━━━━━━━━━━━\n\n"
-                        f"🤝 Other users can now discover and barter with your product.\n\n"
-                        f"💡 *Tip:* Keep your product details updated to attract more offers!\n\n"
-                        f"_– BarterApp Team_ 🛍️"
-                    )
+            # Friendly message based on status
+            if status_value == "approved":
+                msg = (
+                    f"✅ *Product Approved!*\n\n"
+                    f"Hey *{product_obj.owner.username}* 👋\n\n"
+                    f"🎉 Great news! Your product has been *approved* and is now *live* on the platform!\n\n"
+                    f"━━━━━━━━━━━━━━━━\n"
+                    f"📦 *Product:* {product_obj.title}\n"
+                    f"📌 *Status:* Approved ✅\n"
+                    f"━━━━━━━━━━━━━━━━\n\n"
+                    f"🤝 Other users can now discover and barter with your product.\n\n"
+                    f"💡 *Tip:* Keep your product details updated to attract more offers!\n\n"
+                    f"_– BarterApp Team_ 🛍️"
+                )
 
-                elif status_value == "rejected":
-                    msg = (
-                        f"❌ *Product Rejected*\n\n"
-                        f"Hi *{product_obj.owner.username}* 👋\n\n"
-                        f"Unfortunately, your product has been *rejected* after review.\n\n"
-                        f"━━━━━━━━━━━━━━━━\n"
-                        f"📦 *Product:* {product_obj.title}\n"
-                        f"📌 *Status:* Rejected ❌\n"
-                        f"━━━━━━━━━━━━━━━━\n\n"
-                        f"🔍 *What to do next?*\n"
-                        f"  • Review your product title & description\n"
-                        f"  • Ensure images are clear & relevant\n"
-                        f"  • Re-submit after making improvements\n\n"
-                        f"📩 Need help? contact our support team.\n\n"
-                        f"_– BarterApp Team_ 🛍️"
-                    )
+            elif status_value == "rejected":
+                msg = (
+                    f"❌ *Product Rejected*\n\n"
+                    f"Hi *{product_obj.owner.username}* 👋\n\n"
+                    f"Unfortunately, your product has been *rejected* after review.\n\n"
+                    f"━━━━━━━━━━━━━━━━\n"
+                    f"📦 *Product:* {product_obj.title}\n"
+                    f"📌 *Status:* Rejected ❌\n"
+                    f"━━━━━━━━━━━━━━━━\n\n"
+                    f"🔍 *What to do next?*\n"
+                    f"  • Review your product title & description\n"
+                    f"  • Ensure images are clear & relevant\n"
+                    f"  • Re-submit after making improvements\n\n"
+                    f"📩 Need help? contact our support team.\n\n"
+                    f"_– BarterApp Team_ 🛍️"
+                )
 
-                elif status_value == "closed":
-                    msg = (
-                        f"🔒 *Product Closed*\n\n"
-                        f"Hi *{product_obj.owner.username}* 👋\n\n"
-                        f"Your product has been *closed* and is no longer available for barter.\n\n"
-                        f"━━━━━━━━━━━━━━━━\n"
-                        f"📦 *Product:* {product_obj.title}\n"
-                        f"📌 *Status:* Closed 🔒\n"
-                        f"━━━━━━━━━━━━━━━━\n\n"
-                        f"📌 *Why might this happen?*\n"
-                        f"  • The barter was successfully completed\n"
-                        f"  • The listing was manually closed by admin\n\n"
-                        f"➕ Want to list something new? Head over to the app!\n\n"
-                        f"_– BarterApp Team_ 🛍️"
-                    )
+            elif status_value == "closed":
+                msg = (
+                    f"🔒 *Product Closed*\n\n"
+                    f"Hi *{product_obj.owner.username}* 👋\n\n"
+                    f"Your product has been *closed* and is no longer available for barter.\n\n"
+                    f"━━━━━━━━━━━━━━━━\n"
+                    f"📦 *Product:* {product_obj.title}\n"
+                    f"📌 *Status:* Closed 🔒\n"
+                    f"━━━━━━━━━━━━━━━━\n\n"
+                    f"📌 *Why might this happen?*\n"
+                    f"  • The barter was successfully completed\n"
+                    f"  • The listing was manually closed by admin\n\n"
+                    f"➕ Want to list something new? Head over to the app!\n\n"
+                    f"_– BarterApp Team_ 🛍️"
+                )
 
-                elif status_value == "banned":
-                    msg = (
-                        f"🚫 *Product Banned*\n\n"
-                        f"Hi *{product_obj.owner.username}* 👋\n\n"
-                        f"Your product has been *banned* due to a policy violation.\n\n"
-                        f"━━━━━━━━━━━━━━━━\n"
-                        f"📦 *Product:* {product_obj.title}\n"
-                        f"📌 *Status:* Banned 🚫\n"
-                        f"━━━━━━━━━━━━━━━━\n\n"
-                        f"⚠️ *This may have happened because:*\n"
-                        f"  • The product violates our community guidelines\n"
-                        f"  • Inappropriate content was detected\n"
-                        f"  • Repeated policy breaches\n\n"
-                        f"📩 *Think this is a mistake?*\n"
-                        f"Contact our support team and we'll look into it.\n\n"
-                        f"_– BarterApp Team_ 🛍️"
-                    )
+            elif status_value == "banned":
+                msg = (
+                    f"🚫 *Product Banned*\n\n"
+                    f"Hi *{product_obj.owner.username}* 👋\n\n"
+                    f"Your product has been *banned* due to a policy violation.\n\n"
+                    f"━━━━━━━━━━━━━━━━\n"
+                    f"📦 *Product:* {product_obj.title}\n"
+                    f"📌 *Status:* Banned 🚫\n"
+                    f"━━━━━━━━━━━━━━━━\n\n"
+                    f"⚠️ *This may have happened because:*\n"
+                    f"  • The product violates our community guidelines\n"
+                    f"  • Inappropriate content was detected\n"
+                    f"  • Repeated policy breaches\n\n"
+                    f"📩 *Think this is a mistake?*\n"
+                    f"Contact our support team and we'll look into it.\n\n"
+                    f"_– BarterApp Team_ 🛍️"
+                )
 
-                else:
-                    msg = (
-                        f"🔔 *Product Status Updated*\n\n"
-                        f"Hi *{product_obj.owner.username}* 👋\n\n"
-                        f"There's an update on one of your listed products.\n\n"
-                        f"━━━━━━━━━━━━━━━━\n"
-                        f"📦 *Product:* {product_obj.title}\n"
-                        f"📌 *New Status:* {status_value.capitalize()}\n"
-                        f"━━━━━━━━━━━━━━━━\n\n"
-                        f"Open the app for more details.\n\n"
-                        f"_– BarterApp Team_ 🛍️"
-                    )
-                try:
-                    send_whatsapp_message(phone, msg)
-                except Exception as e:
-                    print("WhatsApp Error:", str(e))
+            else:
+                msg = (
+                    f"🔔 *Product Status Updated*\n\n"
+                    f"Hi *{product_obj.owner.username}* 👋\n\n"
+                    f"There's an update on one of your listed products.\n\n"
+                    f"━━━━━━━━━━━━━━━━\n"
+                    f"📦 *Product:* {product_obj.title}\n"
+                    f"📌 *New Status:* {status_value.capitalize()}\n"
+                    f"━━━━━━━━━━━━━━━━\n\n"
+                    f"Open the app for more details.\n\n"
+                    f"_– BarterApp Team_ 🛍️"
+                )
+            try:
+                send_whatsapp_message(phone, msg)
+            except Exception as e:
+                print("WhatsApp Error:", str(e))
 
-            return Response({
-                "message": "Status Changed"
-            })
+        return Response({
+            "message": "Status Changed"
+        })
 
-        else:
-            return Response({
-                "message": "You are not allowed to change status!"
-            })
+        # else:
+        #     return Response({
+        #         "message": "You are not allowed to change status!"
+        #     })
 
     except Exception as e:
         return Response(
