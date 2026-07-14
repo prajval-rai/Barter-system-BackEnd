@@ -50,7 +50,6 @@ elif CLOUD_FILE_NAME:
         os.path.join(BASE_DIR, CLOUD_FILE_NAME)
     )
 
-
 STORAGES = {
     "default": {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
@@ -59,8 +58,8 @@ STORAGES = {
             "project_id": GS_PROJECT_ID,
             "credentials": GS_CREDENTIALS,
             "location": "uploads",
-            "querystring_auth": False,        # <-- stop generating signed URLs
-            "default_acl": "publicRead",      # <-- new uploads are public
+            "querystring_auth": False,        # keep — plain public URLs, not signed
+            "default_acl": None,              # UBLA bucket: no per-object ACL allowed
             "object_parameters": {
                 "cache_control": "public, max-age=31536000, immutable",
             },
@@ -70,6 +69,7 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
 # --------------------
 # APPS
 # --------------------
