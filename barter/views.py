@@ -14,6 +14,36 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def user_dashboard_stats(request):
+    user = request.user
+
+    approved_products_count = Product.objects.filter(
+        owner=user,
+        status="approved"
+    ).count()
+
+    # Barter requests involving the user, either as sender or receiver
+    pending_requests_count = BarterRequest.objects.filter(
+        Q(from_user=user) | Q(to_user=user),
+        status="pending"
+    ).count()
+
+    completed_requests_count = BarterRequest.objects.filter(
+        Q(from_user=user) | Q(to_user=user),
+        status="completed"
+    ).count()
+
+    data = {
+        "approved_products_count": approved_products_count,
+        "pending_barter_requests_count": pending_requests_count,
+        "completed_barter_requests_count": completed_requests_count,
+    }
+    return Response(data)
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_barter_request(request):
