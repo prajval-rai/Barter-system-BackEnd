@@ -20,5 +20,6 @@ urlpatterns = [
     path('saved-products/is-saved/', is_saved),
     path('saved-products/is-saved/', is_saved),
     path('rejected_barter_requests/',rejected_barter_requests),
-    path('completed_barter_requests/',completed_barter_requests)
+    path('completed_barter_requests/',completed_barter_requests),
+    path("dashboard-stats/", user_dashboard_stats, name="dashboard-stats")
 ]
