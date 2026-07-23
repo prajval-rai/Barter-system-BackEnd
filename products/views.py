@@ -374,7 +374,7 @@ def product_list_by_user(request):
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 @parser_classes([MultiPartParser, FormParser])
 def product_detail(request, pk):
     try:
