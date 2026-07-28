@@ -528,7 +528,7 @@ def products_by_status(request):
 @permission_classes([IsAuthenticated])
 def product_dropdown(request):
     try:
-        products = Product.objects.filter(owner=request.user).values('id', 'title')
+        products = Product.objects.filter(owner=request.user,status="approved").values('id', 'title')
         return Response(
             {
                 "success": True,
