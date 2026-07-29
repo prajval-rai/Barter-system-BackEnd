@@ -1,5 +1,6 @@
 from django.contrib import admin
-from .models import CustomUser, Review
+from .models import CustomUser, Review,UserNotification
+
 
 
 @admin.register(CustomUser)
@@ -44,7 +45,7 @@ class CustomUserAdmin(admin.ModelAdmin):
         return obj.contact_number
     decrypted_contact_number.short_description = "Contact number"
 
-
+@admin.site.register(UserNotification)
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
     # Every column shown, all at once — simple list view
