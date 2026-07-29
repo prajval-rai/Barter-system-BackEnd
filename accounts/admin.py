@@ -45,7 +45,6 @@ class CustomUserAdmin(admin.ModelAdmin):
         return obj.contact_number
     decrypted_contact_number.short_description = "Contact number"
 
-@admin.site.register(UserNotification)
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
     # Every column shown, all at once — simple list view
