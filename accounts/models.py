@@ -5,6 +5,7 @@ from encrypted_model_fields.fields import EncryptedCharField
 from .utils import make_hash
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 
@@ -25,7 +26,6 @@ class CustomUser(AbstractUser):
     longitude = models.FloatField(null=True,blank=True)
     address = models.TextField(blank=True,null=True)
     description = models.TextField(blank=True,null=True)
-    rating = models.FloatField(blank=True,null=True)
     role = models.CharField(max_length=30,default="User", choices=ROLE_CHOICES)
     city = models.CharField(max_length=50,blank=True,null=True)
     pincode = models.CharField(max_length=50,blank=True,null=True)
@@ -55,6 +55,54 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.email
 
+ 
+class Review(models.Model):
+    """
+    One user rating/reviewing another — e.g. after completing a trade.
+    """
+ 
+    # ✅ The user being rated
+    rated_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reviews_received",
+    )
+ 
+    # ✅ The user who wrote the review
+    rated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reviews_given",
+    )
+ 
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    )
+    comment = models.TextField(blank=True, null=True)
+ 
+    # If reviews are tied to a specific trade/deal, point this at that
+    # model instead — swap in your Trade FK here, e.g.:
+    # trade = models.ForeignKey("trades.Trade", on_delete=models.CASCADE, related_name="reviews")
+ 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+ 
+    class Meta:
+        db_table = "review"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["rated_user"]),
+        ]
+        constraints = [
+            # A user can't rate themselves
+            models.CheckConstraint(
+                check=~models.Q(rated_user=models.F("rated_by")),
+                name="review_no_self_rating",
+            ),
+        ]
+ 
+    def __str__(self):
+        return f"{self.rated_by} → {self.rated_user}: {self.rating}★"
 
 
 class UserNotification(models.Model):
