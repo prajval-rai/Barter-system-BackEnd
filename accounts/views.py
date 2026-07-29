@@ -150,17 +150,43 @@ def me(request):
     })
 
 
-# ======================================================
-# 🔥 LOGOUT
-# ======================================================
-
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def logout(request):
-    response = Response({"message": "Logged out successfully"})
-    response.delete_cookie("access")
-    response.delete_cookie("refresh")
-    return response
+    """
+    Frontend just calls this with credentials included (cookies sent
+    automatically) — no body required.
+    """
+    try:
+        refresh_token = request.COOKIES.get("refresh")
+
+        # ✅ Blacklist the refresh token so it can't be reused
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except TokenError:
+                pass  # already invalid/expired — nothing to blacklist
+
+        response = Response({"message": "Logout successful"})
+
+        # ✅ Clear cookies (must match path/domain/samesite used when setting them)
+        response.delete_cookie(
+            key="access",
+            samesite="None",
+        )
+        response.delete_cookie(
+            key="refresh",
+            samesite="None",
+        )
+
+        return response
+
+    except Exception as e:
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 # ======================================================
