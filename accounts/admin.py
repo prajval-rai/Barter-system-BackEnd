@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CustomUser
+from .models import CustomUser, Review
 
 
 @admin.register(CustomUser)
@@ -15,7 +15,6 @@ class CustomUserAdmin(admin.ModelAdmin):
         "decrypted_contact_number", "contact_hash", "email_hash",
         "token_created_at", "date_joined", "last_login",
     )
-
     fields = (
         "username", "password",
         "decrypted_first_name", "decrypted_last_name",
@@ -23,7 +22,7 @@ class CustomUserAdmin(admin.ModelAdmin):
         "contact_hash", "email_hash",
         "is_active", "is_staff", "is_superuser", "role",
         "is_verified", "token_created_at",
-        "latitude", "longitude", "address", "description", "rating",
+        "latitude", "longitude", "address", "description",
         "city", "pincode",
         "groups", "user_permissions",
         "date_joined", "last_login",
@@ -44,3 +43,28 @@ class CustomUserAdmin(admin.ModelAdmin):
     def decrypted_contact_number(self, obj):
         return obj.contact_number
     decrypted_contact_number.short_description = "Contact number"
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    # Columns shown in the list view
+    list_display = (
+        "id", "rated_user", "rated_by", "rating", "short_comment", "created_at",
+    )
+    list_filter = ("rating", "created_at")
+    search_fields = (
+        "rated_user__username", "rated_by__username",
+        "rated_user__email_hash", "rated_by__email_hash",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    fields = (
+        "rated_user", "rated_by", "rating", "comment",
+        "created_at", "updated_at",
+    )
+    autocomplete_fields = ("rated_user", "rated_by")
+
+    def short_comment(self, obj):
+        if not obj.comment:
+            return "—"
+        return obj.comment[:50] + ("…" if len(obj.comment) > 50 else "")
+    short_comment.short_description = "Comment"
