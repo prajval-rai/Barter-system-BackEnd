@@ -47,9 +47,10 @@ class CustomUserAdmin(admin.ModelAdmin):
 
 @admin.register(Review)
 class ReviewAdmin(admin.ModelAdmin):
-    # Columns shown in the list view
+    # Every column shown, all at once — simple list view
     list_display = (
-        "id", "rated_user", "rated_by", "rating", "short_comment", "created_at",
+        "id", "rated_user", "rated_by", "rating", "comment",
+        "created_at", "updated_at",
     )
     list_filter = ("rating", "created_at")
     search_fields = (
@@ -57,14 +58,10 @@ class ReviewAdmin(admin.ModelAdmin):
         "rated_user__email_hash", "rated_by__email_hash",
     )
     readonly_fields = ("created_at", "updated_at")
-    fields = (
-        "rated_user", "rated_by", "rating", "comment",
-        "created_at", "updated_at",
-    )
     autocomplete_fields = ("rated_user", "rated_by")
 
-    def short_comment(self, obj):
-        if not obj.comment:
-            return "—"
-        return obj.comment[:50] + ("…" if len(obj.comment) > 50 else "")
-    short_comment.short_description = "Comment"
+    def changelist_view(self, request, extra_context=None):
+        # ✅ Shows total review count above the table
+        extra_context = extra_context or {}
+        extra_context["total_reviews"] = self.get_queryset(request).count()
+        return super().changelist_view(request, extra_context=extra_context)
