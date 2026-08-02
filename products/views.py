@@ -89,7 +89,7 @@ def create_product(request):
             pass  # log if you want, but never fail the request over this
 
     try:
-        review_url = f"{settings.FRONTEND_BASE_URL}/admin/products/{product.id}/review"
+        review_url = f"{settings.FRONTEND_BASE_URL}/admin/products/{product.id}"
         plain_message, html_message = build_admin_review_email(product, review_url)
         send_html_email(
             subject=f"🆕 New Product Pending Review: {product.title}",
@@ -715,7 +715,7 @@ def change_product_status(request):
 #   }
 # ════════════════════════════════════════════════════════════════════════════
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def marketplace(request):
     # ── 1. Parse params ──────────────────────────────────────────────────────
     try:

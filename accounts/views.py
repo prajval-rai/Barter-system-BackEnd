@@ -82,6 +82,11 @@ def google_login(request):
         user.last_login = timezone.now()
         user.save()
 
+        # 🔧 FIX: refresh from DB so encrypted fields are re-loaded through the
+        # normal decrypt-on-read path instead of staying as ciphertext left
+        # behind by the encrypted field's pre_save() mutation on this instance.
+        user.refresh_from_db()
+
         # ✅ Generate JWT
         tokens = get_tokens_for_user(user)
 
@@ -104,7 +109,7 @@ def google_login(request):
             key="access",
             value=tokens["access"],
             httponly=True,
-            secure=True,  # change to True in production
+            secure=True,
             samesite="None",
             max_age=86400,
         )
@@ -122,7 +127,7 @@ def google_login(request):
             key="refresh",
             value=tokens["refresh"],
             httponly=True,
-            secure=True,  # change to True in production
+            secure=True,
             samesite="None",
             max_age=604800,
         )
