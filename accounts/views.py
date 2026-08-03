@@ -32,6 +32,123 @@ def get_tokens_for_user(user):
 # 🔥 GOOGLE LOGIN
 # ======================================================
 
+import os
+
+
+
+from .utils import send_email
+
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
+FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "").rstrip("/")
+
+
+def build_welcome_email_html(first_name: str) -> str:
+    marketplace_url = f"{FRONTEND_BASE_URL}/marketplace"
+
+    return f"""
+    <!DOCTYPE html>
+    <html>
+      <body style="margin:0; padding:0; background-color:#eaf1ff; font-family: 'Helvetica Neue', Arial, sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:linear-gradient(180deg,#dce9ff 0%,#eaf1ff 40%,#ffffff 100%); padding:48px 0;">
+          <tr>
+            <td align="center">
+              <table width="480" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:24px; overflow:hidden; box-shadow:0 20px 50px rgba(23,43,99,0.12);">
+
+                <!-- Header / brand -->
+                <tr>
+                  <td align="center" style="padding:36px 32px 20px;">
+                    <table cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding-right:8px; vertical-align:middle;">
+                          <div style="width:36px; height:36px; border-radius:10px; background:#2563eb; display:inline-block; line-height:36px; text-align:center;">
+                            <span style="color:#ffffff; font-size:18px; font-weight:bold;">⇄</span>
+                          </div>
+                        </td>
+                        <td style="vertical-align:middle;">
+                          <span style="font-size:22px; font-weight:800; color:#0f172a;">Len<span style="color:#2563eb;">Den</span></span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Headline -->
+                <tr>
+                  <td align="center" style="padding:0 40px 8px;">
+                    <p style="margin:0; font-size:12px; letter-spacing:1.5px; font-weight:700; color:#2563eb; text-transform:uppercase;">
+                      Welcome to LenDen
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:0 40px 16px;">
+                    <h1 style="margin:0; font-size:24px; line-height:1.3; color:#0f172a; font-weight:800;">
+                      Hey {first_name or "there"}, your<br/>account is ready 🎉
+                    </h1>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:0 40px 28px;">
+                    <p style="margin:0; font-size:14.5px; color:#64748b; line-height:1.7;">
+                      You're signed in with Google — no password needed.
+                      Start browsing what people are exchanging near you,
+                      and give your unused items a second life.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- CTA button -->
+                <tr>
+                  <td align="center" style="padding:0 40px 32px;">
+                    <a href="{marketplace_url}"
+                       style="display:inline-block; padding:14px 32px; background:#2563eb; color:#ffffff; text-decoration:none; font-size:14.5px; font-weight:700; border-radius:999px; box-shadow:0 8px 20px rgba(37,99,235,0.35);">
+                      Find what you need →
+                    </a>
+                  </td>
+                </tr>
+
+                <!-- Divider -->
+                <tr>
+                  <td style="padding:0 40px;">
+                    <div style="height:1px; background:#e5e9f2;"></div>
+                  </td>
+                </tr>
+
+                <!-- Tagline -->
+                <tr>
+                  <td align="center" style="padding:24px 40px 8px;">
+                    <p style="margin:0; font-size:13px; color:#94a3b8; font-style:italic;">
+                      "Jo aapke liye useless hai, kisi aur ke liye valuable ho sakta hai."
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:0 40px 28px;">
+                    <p style="margin:0; font-size:12.5px; font-weight:700; color:#2563eb;">
+                      #ExchangeForBetter
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td align="center" style="background:#f8fafc; padding:20px 32px;">
+                    <p style="margin:0; font-size:11.5px; color:#9ca3af;">
+                      © {timezone.now().year} LenDen. All rights reserved.
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+    """
+
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def google_login(request):
@@ -87,6 +204,17 @@ def google_login(request):
         # behind by the encrypted field's pre_save() mutation on this instance.
         user.refresh_from_db()
 
+        # ✅ Send welcome email only for newly created users
+        if created:
+            try:
+                send_email(
+                    to=user.email,
+                    subject="Welcome! Your account is ready 🎉",
+                    html=build_welcome_email_html(user.first_name),
+                )
+            except Exception:
+                pass  # don't let an email failure break login
+
         # ✅ Generate JWT
         tokens = get_tokens_for_user(user)
 
@@ -139,6 +267,7 @@ def google_login(request):
             {"error": str(e)},
             status=status.HTTP_400_BAD_REQUEST
         )
+    
 # ======================================================
 # 🔥 GET CURRENT USER
 # ======================================================
